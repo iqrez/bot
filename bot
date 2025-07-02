@@ -1,0 +1,2350 @@
+import asyncio
+import logging
+import sys
+import os
+import subprocess
+import shutil
+import time
+import hashlib
+import json
+import zipfile
+import tarfile
+import typing
+import re
+from pathlib import Path
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Any, Tuple
+from urllib.parse import urlparse, parse_qs
+from discord.ext import commands
+from discord import app_commands
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, BigInteger, Float
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
+from sqlalchemy.dialects.postgresql import JSON
+
+import discord
+import random
+import aiohttp
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+import yt_dlp
+
+def extract_youtube_id(url: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extracts the YouTube video ID and playlist ID from a URL.
+
+    Args:
+        url (str): The full YouTube or playlist URL.
+
+    Returns:
+        Tuple[Optional[str], Optional[str]]: A tuple of (video_id, playlist_id), either or both can be None.
+    """
+    video_id = None
+    playlist_id = None
+
+    try:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+
+        if "v" in query:
+            video_id = query["v"][0]
+        elif parsed.path.startswith("/watch/") or parsed.path.startswith("/embed/"):
+            match = re.search(r"/(?:watch|embed)/([0-9A-Za-z_-]{11})", parsed.path)
+            if match:
+                video_id = match.group(1)
+
+        if "list" in query:
+            playlist_id = query["list"][0]
+    except Exception as e:
+        print(f"Failed to parse YouTube URL: {e}")
+
+    return video_id, playlist_id
+
+# Global scope
+ydl_opts = {
+    'format': 'bestaudio/best',
+    'quiet': True,
+    'default_search': 'ytsearch1',
+    'extract_flat': 'in_playlist',
+}
+
+def search_youtube(query):
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            result = ydl.extract_info(query, download=False)
+            if 'entries' in result and result['entries']:
+                return result['entries'][0]
+            return result
+    except Exception as e:
+        print(f"[ERROR] yt-dlp fallback search failed for '{query}': {e}")
+        return None
+
+# Check for module conflicts
+def check_module_conflicts():
+    current_dir = Path.cwd()
+    conflicting_files = [
+        'uu.py', 'urllib.py', 'email.py', 'http.py', 'json.py',
+        'discord.py', 'asyncio.py', 'logging.py', 'os.py'
+    ]
+    found_conflicts = [f for f in conflicting_files if (current_dir / f).exists()]
+    if found_conflicts:
+        print("ERROR: Module naming conflicts detected!")
+        print("The following files conflict with Python built-in modules:")
+        for conflict in found_conflicts:
+            print(f"  - {conflict}")
+        print("\nPlease rename or remove these files and try again.")
+        sys.exit(1)
+
+check_module_conflicts()
+
+# Try to import ratelimit, with fallback
+try:
+    from ratelimit import limits, sleep_and_retry
+    RATE_LIMIT_AVAILABLE = True
+    logger = logging.getLogger(__name__)
+    logger.info("ratelimit package found and imported successfully")
+except ImportError:
+    RATE_LIMIT_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("ratelimit package not found. Using Discord.py cooldown instead.")
+
+try:
+    import urllib.request
+except ImportError as e:
+    print(f"Failed to import urllib: {e}")
+    print("This usually indicates a module naming conflict.")
+    sys.exit(1)
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+@dataclass
+class BotConfig:
+    discord_token: str
+    youtube_api_key: str
+    allowed_guild_ids: Optional[list] = None
+    menu_channel_id: Optional[int] = None
+    ffmpeg_executable: Optional[str] = None
+    max_queue_size: int = 100
+    default_volume: float = 0.5
+    auto_disconnect_delay: int = 300
+    search_results_limit: int = 5
+
+def setup_logging():
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(log_dir / "bot.log", encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logging.getLogger('discord').setLevel(logging.WARNING)
+    logging.getLogger('discord.http').setLevel(logging.WARNING)
+    logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# DEPENDENCY MANAGEMENT
+# =============================================================================
+
+REQUIRED_PACKAGES = [
+    "discord.py>=2.3.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "PyNaCl>=1.5.0",
+    "ratelimit>=2.2.1",
+    "google-api-python-client>=2.100.0"
+]
+
+CACHE_DIR = Path("music_cache")
+MAX_CACHE_SIZE_GB = 2
+LOCAL_SONGS_FILE = Path("local_songs.json")
+
+async def install_missing_packages():
+    logger.info("Checking dependencies...")
+    max_retries = 3
+    for package in REQUIRED_PACKAGES:
+        package_name = package.split(">=")[0].split("==")[0]
+        for attempt in range(max_retries):
+            try:
+                module = __import__(package_name.replace("-", "_"))
+                version = getattr(module, '__version__', 'unknown')
+                logger.info(f"{package_name} is already installed (version: {version}) at {module.__file__}")
+                break
+            except ImportError:
+                logger.info(f"Installing {package} (attempt {attempt + 1}/{max_retries})...")
+                try:
+                    subprocess.check_call([
+                        sys.executable, "-m", "pip", "install", package, "--upgrade", "--user", "--force-reinstall"
+                    ])
+                    logger.info(f"Successfully installed {package}")
+                    break
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Failed to install {package}: {e}")
+                    if attempt == max_retries - 1:
+                        if package_name == "ratelimit":
+                            logger.warning("ratelimit installation failed. Using Discord.py cooldown instead.")
+                        else:
+                            logger.error(f"Critical dependency {package} could not be installed. Exiting.")
+                            sys.exit(1)
+                    await asyncio.sleep(2 ** attempt)
+
+def install_ffmpeg() -> str:
+    logger.info("Installing FFmpeg...")
+    system = os.name
+    ffmpeg_dir = Path("ffmpeg")
+    ffmpeg_dir.mkdir(exist_ok=True)
+    try:
+        if system == 'nt':
+            logger.info("Installing FFmpeg for Windows...")
+            url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+            zip_path = "ffmpeg_windows.zip"
+            logger.info("Downloading FFmpeg...")
+            urllib.request.urlretrieve(url, zip_path)
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(".")
+            extracted_dirs = [d for d in os.listdir('.') if d.startswith('ffmpeg-')]
+            if extracted_dirs:
+                extracted_dir = extracted_dirs[0]
+                ffmpeg_exe = os.path.join(extracted_dir, 'bin', 'ffmpeg.exe')
+                if os.path.exists(ffmpeg_exe):
+                    shutil.move(extracted_dir, 'ffmpeg')
+                    os.remove(zip_path)
+                    logger.info("FFmpeg installed successfully for Windows")
+                    return os.path.abspath(os.path.join('ffmpeg', 'bin', 'ffmpeg.exe'))
+            raise Exception("Failed to extract FFmpeg")
+        else:
+            logger.info("Installing FFmpeg for Linux...")
+            try:
+                result = subprocess.run(['which', 'apt'], capture_output=True)
+                if result.returncode == 0:
+                    logger.info("Installing via apt...")
+                    subprocess.run(['sudo', 'apt', 'update'], check=True)
+                    subprocess.run(['sudo', 'apt', 'install', '-y', 'ffmpeg'], check=True)
+                    return 'ffmpeg'
+            except Exception:
+                pass
+            try:
+                result = subprocess.run(['which', 'yum'], capture_output=True)
+                if result.returncode == 0:
+                    logger.info("Installing via yum...")
+                    subprocess.run(['sudo', 'yum', 'install', '-y', 'ffmpeg'], check=True)
+                    return 'ffmpeg'
+            except Exception:
+                pass
+            logger.info("Downloading static FFmpeg build...")
+            url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+            tar_path = "ffmpeg_linux.tar.xz"
+            urllib.request.urlretrieve(url, tar_path)
+            with tarfile.open(tar_path, 'r:xz') as tar_ref:
+                tar_ref.extractall(".")
+            extracted_dirs = [d for d in os.listdir('.') if d.startswith('ffmpeg-')]
+            if extracted_dirs:
+                extracted_dir = extracted_dirs[0]
+                ffmpeg_exe = os.path.join(extracted_dir, 'ffmpeg')
+                if os.path.exists(ffmpeg_exe):
+                    shutil.move(extracted_dir, 'ffmpeg')
+                    os.remove(tar_path)
+                    logger.info("FFmpeg installed successfully for Linux")
+                    return os.path.abspath(os.path.join('ffmpeg', 'ffmpeg'))
+            raise Exception("Failed to extract FFmpeg")
+    except Exception as e:
+        logger.error(f"FFmpeg auto-installation failed: {e}")
+        raise
+
+def ensure_ffmpeg() -> str:
+    logger.info("Checking FFmpeg installation...")
+    ffmpeg_paths = [
+        "ffmpeg",
+        "/usr/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+        "/opt/homebrew/bin/ffmpeg",
+        "/nix/store/*/bin/ffmpeg",
+        "./ffmpeg/bin/ffmpeg",
+        "./ffmpeg/ffmpeg.exe"
+    ]
+    for path in ffmpeg_paths:
+        if shutil.which(path) or os.path.exists(path):
+            logger.info(f"FFmpeg found at: {path}")
+            return path if shutil.which(path) else os.path.abspath(path)
+    if os.path.exists('/nix'):
+        try:
+            result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True)
+            if result.returncode == 0:
+                ffmpeg_path = result.stdout.strip()
+                logger.info(f"FFmpeg found at: {ffmpeg_path}")
+                return ffmpeg_path
+        except Exception:
+            pass
+    logger.info("FFmpeg not found. Attempting auto-installation...")
+    try:
+        return install_ffmpeg()
+    except Exception as e:
+        logger.error(f"Failed to auto-install FFmpeg: {e}")
+        logger.error("Please install FFmpeg manually:")
+        logger.error("  Ubuntu/Debian: sudo apt install ffmpeg")
+        logger.error("  macOS: brew install ffmpeg")
+        logger.error("  Windows: Download from https://ffmpeg.org/download.html")
+        sys.exit(1)
+
+def get_config() -> BotConfig:
+    discord_token = "MTM4NzM4NzYwOTA0NjcxMjQyMA.GHt4TX.5QE-KnKMpES2WK5X5UkOLj5u6x_PIaARCCaKS4"
+    logger.info("Using working Discord bot token")
+    
+    youtube_api_key = "AIzaSyCpgM0W1DunsnEas0Fn_2h77r6nhS8rS7w"
+    
+    menu_channel_id = None
+    return BotConfig(
+        discord_token=discord_token,
+        youtube_api_key=youtube_api_key,
+        allowed_guild_ids=None,
+        menu_channel_id=menu_channel_id,
+        ffmpeg_executable=ensure_ffmpeg(),
+        max_queue_size=100,
+        default_volume=0.5,
+        auto_disconnect_delay=300,
+        search_results_limit=5
+    )
+
+# =============================================================================
+# DATABASE MODELS
+# =============================================================================
+
+Base = declarative_base()
+
+class Guild(Base):
+    __tablename__ = 'guilds'
+    id = Column(BigInteger, primary_key=True)
+    name = Column(String(100), nullable=False)
+    menu_channel_id = Column(BigInteger, nullable=True)
+    default_volume = Column(Float, default=0.5)
+    auto_disconnect = Column(Boolean, default=True)
+    auto_disconnect_delay = Column(Integer, default=300)
+    loop_enabled = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class PlayHistory(Base):
+    __tablename__ = 'play_history'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    guild_id = Column(BigInteger, nullable=False)
+    user_id = Column(BigInteger, nullable=False)
+    title = Column(String(500), nullable=False)
+    url = Column(Text, nullable=False)
+    platform = Column(String(50), nullable=False)
+    duration = Column(Integer, nullable=True)
+    thumbnail = Column(Text, nullable=True)
+    uploader = Column(String(200), nullable=True)
+    genre = Column(String(100), nullable=True)
+    played_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class UserPlaylist(Base):
+    __tablename__ = 'user_playlists'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, nullable=False)
+    guild_id = Column(BigInteger, nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    songs = Column(JSON, nullable=False, default=list)
+    is_public = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class SearchHistory(Base):
+    __tablename__ = 'search_history'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    guild_id = Column(BigInteger, nullable=False)
+    user_id = Column(BigInteger, nullable=False)
+    query = Column(Text, nullable=False)
+    result_count = Column(Integer, default=0)
+    searched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class BotStats(Base):
+    __tablename__ = 'bot_stats'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    guild_id = Column(BigInteger, nullable=False)
+    command_name = Column(String(100), nullable=False)
+    user_id = Column(BigInteger, nullable=False)
+    success = Column(Boolean, default=True)
+    error_message = Column(Text, nullable=True)
+    execution_time = Column(Float, nullable=True)
+    executed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class CachedSong(Base):
+    __tablename__ = 'cached_songs'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    url_hash = Column(String(64), unique=True, nullable=False)
+    original_url = Column(Text, nullable=False)
+    title = Column(String(500), nullable=False)
+    uploader = Column(String(200), nullable=True)
+    duration = Column(Integer, nullable=True)
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(BigInteger, nullable=False)
+    genre = Column(String(100), nullable=True)
+    download_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_accessed = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    access_count = Column(Integer, default=0)
+
+# =============================================================================
+# PIN MANAGER
+# =============================================================================
+
+class PinManager:
+    MASTER_PIN = "1234"  # Hardcoded master PIN
+
+    @staticmethod
+    def verify_pin(pin: str) -> bool:
+        return pin == PinManager.MASTER_PIN
+
+# =============================================================================
+# LOCAL SONGS MANAGER
+# =============================================================================
+
+class LocalSongsManager:
+    def __init__(self, file_path: Path = LOCAL_SONGS_FILE):
+        self.file_path = file_path
+        self.songs: List[Dict[str, Any]] = []
+        self.load_songs()
+
+    def load_songs(self):
+        if self.file_path.exists():
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as f:
+                    self.songs = json.load(f)
+                self.songs = [s for s in self.songs if Path(s['file_path']).exists()]
+                self.save_songs()
+            except Exception as e:
+                logger.error(f"Failed to load local songs: {e}")
+                self.songs = []
+
+    def save_songs(self):
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.songs, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save local songs: {e}")
+
+    def add_song(self, song_data: Dict[str, Any], file_path: str):
+        song_entry = {
+            'title': song_data.get('title', 'Unknown'),
+            'url': song_data.get('url', ''),
+            'uploader': song_data.get('uploader', 'Unknown'),
+            'duration': song_data.get('duration', 0),
+            'genre': song_data.get('genre', 'Unknown'),
+            'file_path': file_path
+        }
+        self.songs.append(song_entry)
+        self.save_songs()
+
+    def get_songs(self) -> List[Dict[str, Any]]:
+        return self.songs
+
+    def play_song(self, title: str) -> Optional[Dict[str, Any]]:
+        for song in self.songs:
+            if song['title'].lower() == title.lower():
+                return song
+        return None
+
+local_songs_manager: Optional[LocalSongsManager] = None
+
+def get_local_songs_manager() -> LocalSongsManager:
+    global local_songs_manager
+    if local_songs_manager is None:
+        local_songs_manager = LocalSongsManager()
+    return local_songs_manager
+
+# =============================================================================
+# CACHE MANAGER
+# =============================================================================
+
+cache_manager: Optional['CacheManager'] = None
+
+def get_cache_manager() -> 'CacheManager':
+    global cache_manager
+    if cache_manager is None:
+        cache_manager = CacheManager()
+    return cache_manager
+
+class CacheManager:
+    def __init__(self, cache_dir: Path = CACHE_DIR, max_size_gb: float = MAX_CACHE_SIZE_GB):
+        self.cache_dir = cache_dir
+        self.max_size_bytes = int(max_size_gb * 1024 * 1024 * 1024)
+        self.cache_dir.mkdir(exist_ok=True)
+        logger.info(f"Cache manager initialized: {cache_dir} (max: {max_size_gb}GB)")
+
+    def get_url_hash(self, url: str) -> str:
+        return hashlib.sha256(url.encode()).hexdigest()
+
+    def get_cache_path(self, url_hash: str, title: str) -> Path:
+        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        safe_title = safe_title[:100]
+        return self.cache_dir / f"{url_hash}_{safe_title}.mp3"
+
+    async def is_cached(self, url: str) -> Optional[Path]:
+        if not db_manager:
+            return None
+        session = db_manager.get_session()
+        try:
+            url_hash = self.get_url_hash(url)
+            cached = session.query(CachedSong).filter(CachedSong.url_hash == url_hash).first()
+            if cached and os.path.exists(cached.file_path.strip('"')):
+                cached.last_accessed = datetime.now(timezone.utc)
+                cached.access_count = CachedSong.access_count + 1
+                session.commit()
+                return Path(cached.file_path)
+            elif cached:
+                session.delete(cached)
+                session.commit()
+            return None
+        finally:
+            session.close()
+
+    async def cache_song(self, song_data: Dict[str, Any], progress_callback=None) -> Optional[Path]:
+        max_retries = 3
+        backoff_factor = 2
+        for attempt in range(max_retries):
+            try:
+                url = song_data.get('url')
+                if not url:
+                    return None
+                url_hash = self.get_url_hash(url)
+                title = song_data.get('title', 'Unknown')
+                cached_path = await self.is_cached(url)
+                if cached_path:
+                    logger.info(f"Song already cached: {title}")
+                    return cached_path
+                await self.cleanup_if_needed()
+                cache_path = self.get_cache_path(url_hash, title)
+                
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': str(cache_path.with_suffix('.%(ext)s')),
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192',
+                    }],
+                    'quiet': True,
+                    'no_warnings': True,
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    await asyncio.get_event_loop().run_in_executor(None, ydl.download, [url])
+                
+                downloaded_files = list(cache_path.parent.glob(f"{cache_path.stem}.*"))
+                actual_path = next((f for f in downloaded_files if f.suffix.lower() in ['.mp3', '.m4a', '.webm', '.ogg']), None)
+                if not actual_path or not actual_path.exists():
+                    logger.error(f"Download failed for: {title}")
+                    return None
+                if actual_path.suffix != '.mp3':
+                    final_path = actual_path.with_suffix('.mp3')
+                    actual_path.rename(final_path)
+                    actual_path = final_path
+                file_size = actual_path.stat().st_size
+                if db_manager:
+                    session = db_manager.get_session()
+                    try:
+                        cached_song = CachedSong(
+                            url_hash=url_hash,
+                            original_url=url,
+                            title=title,
+                            uploader=song_data.get('uploader'),
+                            duration=song_data.get('duration'),
+                            file_path=str(actual_path),
+                            file_size=file_size,
+                            genre=song_data.get('genre')
+                        )
+                        session.add(cached_song)
+                        session.commit()
+                        logger.info(f"Song cached successfully: {title} ({file_size / 1024 / 1024:.1f}MB)")
+                        get_local_songs_manager().add_song(song_data, str(actual_path))
+                    finally:
+                        session.close()
+                return actual_path
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    delay = backoff_factor ** attempt
+                    logger.warning(f"Download attempt {attempt + 1} failed for {title}: {e}. Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"Failed to cache song {title} after {max_retries} attempts: {e}")
+                    return None
+
+    async def cleanup_if_needed(self):
+        if not db_manager:
+            return
+        session = db_manager.get_session()
+        try:
+            cached_songs = session.query(CachedSong).order_by(CachedSong.last_accessed).all()
+            total_size = sum(song.file_size for song in cached_songs)
+            while total_size > self.max_size_bytes and cached_songs:
+                song_to_remove = cached_songs.pop(0)
+                try:
+                    if os.path.exists(song_to_remove.file_path.strip('"')):
+                        os.remove(song_to_remove.file_path.strip('"'))
+                        total_size -= song_to_remove.file_size
+                        logger.info(f"Removed cached song: {song_to_remove.title}")
+                    session.delete(song_to_remove)
+                except Exception as e:
+                    logger.warning(f"Failed to remove cached file: {e}")
+            session.commit()
+        finally:
+            session.close()
+
+    async def get_cache_stats(self) -> Dict[str, Any]:
+        if not db_manager:
+            return {"error": "Database not available"}
+        session = db_manager.get_session()
+        try:
+            cached_songs = session.query(CachedSong).all()
+            total_size = sum(song.file_size for song in cached_songs)
+            return {
+                "total_songs": len(cached_songs),
+                "total_size_mb": round(total_size / 1024 / 1024, 1),
+                "total_size_gb": round(total_size / 1024 / 1024 / 1024, 2),
+                "max_size_gb": self.max_size_bytes / 1024 / 1024 / 1024,
+                "usage_percentage": round((total_size / self.max_size_bytes) * 100, 1)
+            }
+        finally:
+            session.close()
+
+    async def clear_cache(self):
+        if not db_manager:
+            return
+        session = db_manager.get_session()
+        try:
+            cached_songs = session.query(CachedSong).all()
+            for song in cached_songs:
+                try:
+                    if os.path.exists(song.file_path.strip('"')):
+                        os.remove(song.file_path.strip('"'))
+                except Exception as e:
+                    logger.warning(f"Failed to remove file {song.file_path}: {e}")
+            session.query(CachedSong).delete()
+            session.commit()
+            logger.info("Cache cleared successfully")
+            get_local_songs_manager().songs = []
+            get_local_songs_manager().save_songs()
+        finally:
+            session.close()
+
+# =============================================================================
+# DATABASE MANAGER
+# =============================================================================
+
+class DatabaseManager:
+    def __init__(self):
+        self.database_url = os.getenv('DATABASE_URL')
+        if not self.database_url:
+            logger.warning("DATABASE_URL not found, using SQLite fallback")
+            self.database_url = "sqlite:///music_bot.db"
+        self.engine = create_engine(
+            self.database_url,
+            pool_pre_ping=True,
+            pool_recycle=300,
+            echo=False,
+            pool_size=5,
+            max_overflow=10
+        )
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.create_tables()
+        logger.info("Database manager initialized successfully")
+
+    def create_tables(self):
+        try:
+            Base.metadata.drop_all(bind=self.engine)
+            Base.metadata.create_all(bind=self.engine)
+            logger.info("Database tables dropped and recreated successfully")
+        except Exception as e:
+            logger.error(f"Failed to create database tables: {e}")
+            raise
+
+    def get_session(self) -> Session:
+        return self.SessionLocal()
+
+    def add_play_history(self, guild_id: int, user_id: int, song_data: Dict[str, Any]):
+        session = self.get_session()
+        try:
+            history = PlayHistory(
+                guild_id=guild_id,
+                user_id=user_id,
+                title=song_data.get('title', 'Unknown'),
+                url=song_data.get('url', ''),
+                platform=song_data.get('platform', 'unknown'),
+                duration=song_data.get('duration'),
+                thumbnail=song_data.get('thumbnail'),
+                uploader=song_data.get('uploader'),
+                genre=song_data.get('genre')
+            )
+            session.add(history)
+            session.commit()
+        except Exception as e:
+            logger.error(f"Failed to add play history: {e}")
+        finally:
+            session.close()
+
+    def get_or_create_guild(self, guild_id: int, guild_name: str) -> Guild:
+        session = self.get_session()
+        try:
+            guild = session.query(Guild).filter(Guild.id == guild_id).first()
+            if not guild:
+                guild = Guild(id=guild_id, name=guild_name)
+                session.add(guild)
+                session.commit()
+                logger.info(f"Created new guild record: {guild_name} ({guild_id})")
+            else:
+                if guild.name != guild_name:
+                    session.query(Guild).filter(Guild.id == guild_id).update({
+                        Guild.name: guild_name,
+                        Guild.updated_at: datetime.now(timezone.utc)
+                    })
+                    session.commit()
+            return guild
+        finally:
+            session.close()
+
+    def create_playlist(self, user_id: int, guild_id: int, name: str, description: str = None) -> UserPlaylist:
+        session = self.get_session()
+        try:
+            playlist = UserPlaylist(
+                user_id=user_id,
+                guild_id=guild_id,
+                name=name,
+                description=description,
+                songs=[]
+            )
+            session.add(playlist)
+            session.commit()
+            session.refresh(playlist)
+            return playlist
+        finally:
+            session.close()
+
+    def delete_playlist(self, playlist_id: int) -> bool:
+        session = self.get_session()
+        try:
+            playlist = session.query(UserPlaylist).filter(UserPlaylist.id == playlist_id).first()
+            if playlist:
+                session.delete(playlist)
+                session.commit()
+                return True
+            return False
+        finally:
+            session.close()
+
+    def add_song_to_playlist(self, playlist_id: int, song_data: Dict[str, Any]) -> bool:
+        session = self.get_session()
+        try:
+            playlist = session.query(UserPlaylist).filter(UserPlaylist.id == playlist_id).first()
+            if playlist:
+                songs = playlist.songs or []
+                songs.append(song_data)
+                session.query(UserPlaylist).filter(UserPlaylist.id == playlist_id).update({
+                    UserPlaylist.songs: songs,
+                    UserPlaylist.updated_at: datetime.now(timezone.utc)
+                })
+                session.commit()
+                return True
+            return False
+        finally:
+            session.close()
+
+    def remove_song_from_playlist(self, playlist_id: int, song_index: int) -> bool:
+        session = self.get_session()
+        try:
+            playlist = session.query(UserPlaylist).filter(UserPlaylist.id == playlist_id).first()
+            if playlist and 0 <= song_index < len(playlist.songs):
+                songs = playlist.songs
+                songs.pop(song_index)
+                session.query(UserPlaylist).filter(UserPlaylist.id == playlist_id).update({
+                    UserPlaylist.songs: songs,
+                    UserPlaylist.updated_at: datetime.now(timezone.utc)
+                })
+                session.commit()
+                return True
+            return False
+        finally:
+            session.close()
+
+    def get_user_playlists(self, user_id: int, guild_id: int) -> List[UserPlaylist]:
+        session = self.get_session()
+        try:
+            return session.query(UserPlaylist)\
+                .filter(UserPlaylist.user_id == user_id, UserPlaylist.guild_id == guild_id)\
+                .order_by(UserPlaylist.created_at.desc())\
+                .all()
+        finally:
+            session.close()
+
+    def add_search_history(self, guild_id: int, user_id: int, query: str, result_count: int = 0):
+        session = self.get_session()
+        try:
+            search = SearchHistory(
+                guild_id=guild_id,
+                user_id=user_id,
+                query=query,
+                result_count=result_count
+            )
+            session.add(search)
+            session.commit()
+        except Exception as e:
+            logger.error(f"Failed to add search history: {e}")
+        finally:
+            session.close()
+
+    def add_command_stat(self, guild_id: int, user_id: int, command_name: str,
+                        success: bool = True, error_message: str = None, execution_time: float = None):
+        session = self.get_session()
+        try:
+            stat = BotStats(
+                guild_id=guild_id,
+                user_id=user_id,
+                command_name=command_name,
+                success=success,
+                error_message=error_message,
+                execution_time=execution_time
+            )
+            session.add(stat)
+            session.commit()
+        except Exception as e:
+            logger.error(f"Failed to add command stat: {e}")
+        finally:
+            session.close()
+
+    def get_guild_stats(self, guild_id: int) -> Dict[str, Any]:
+        session = self.get_session()
+        try:
+            total_commands = session.query(BotStats).filter(BotStats.guild_id == guild_id).count()
+            total_plays = session.query(PlayHistory).filter(PlayHistory.guild_id == guild_id).count()
+            total_searches = session.query(SearchHistory).filter(SearchHistory.guild_id == guild_id).count()
+            return {
+                'total_commands': total_commands,
+                'total_plays': total_plays,
+                'total_searches': total_searches
+            }
+        finally:
+            session.close()
+
+db_manager: Optional[DatabaseManager] = None
+
+def init_database():
+    global db_manager
+    try:
+        db_manager = DatabaseManager()
+        logger.info("Database initialized successfully")
+        get_cache_manager()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        return False
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+def create_embed(title: str, description: str, color=discord.Color.blue(), thumbnail=None, footer=None) -> discord.Embed:
+    embed = discord.Embed(title=title, description=description, color=color)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    if footer:
+        embed.set_footer(text=footer)
+    embed.timestamp = discord.utils.utcnow()
+    return embed
+
+def create_success_embed(title: str, description: str) -> discord.Embed:
+    return create_embed(title, description, discord.Color.green())
+
+def create_error_embed(title: str, description: str) -> discord.Embed:
+    return create_embed(title, description, discord.Color.red())
+
+def create_progress_bar(progress: float, total: float, length: int = 10) -> str:
+    if total <= 0:
+        return "â  " * length
+    filled = int(length * progress / total)
+    return "â  " * filled + "â  " * (length - filled)
+
+async def robust_voice_connect(voice_channel, bot, max_retries=3, initial_delay=2):
+    """Enhanced voice connection with retry logic and cloud environment optimizations"""
+    voice_client = voice_channel.guild.voice_client
+    if voice_client and voice_channel == voice_client.channel and voice_client.is_connected():
+        logger.info(f"Already connected to {voice_channel.name}")
+        return voice_client
+    
+    # Cleanup any existing connections more thoroughly
+    if voice_client:
+        try:
+            await voice_client.disconnect(force=True)
+            await asyncio.sleep(3)
+        except:
+            pass
+        
+        try:
+            voice_channel.guild._voice_client = None
+        except:
+            pass
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Connecting to voice channel: {voice_channel.name} (attempt {attempt + 1})")
+            
+            voice_client = await voice_channel.connect(
+                timeout=45.0,
+                reconnect=True,
+                self_deaf=True,
+                self_mute=False
+            )
+            
+            await asyncio.sleep(2)
+            if voice_client and voice_client.is_connected():
+                logger.info(f"Successfully connected to voice channel: {voice_channel.name}")
+                return voice_client
+            else:
+                raise Exception("Connection verification failed")
+                
+        except discord.errors.ConnectionClosed as e:
+            if e.code == 4006:
+                logger.warning("Voice session invalid (4006) - Discord connection issue, forcing cleanup")
+                try:
+                    if voice_channel.guild.voice_client:
+                        await voice_channel.guild.voice_client.disconnect(force=True)
+                    voice_channel.guild._voice_client = None
+                    await asyncio.sleep(5)
+                except:
+                    pass
+            logger.error(f"Voice connection attempt {attempt + 1} failed with code {e.code}: {e}")
+            
+        except discord.errors.ClientException as e:
+            if "Already connected to a voice channel" in str(e):
+                logger.warning("Discord says already connected but connection is invalid, forcing cleanup")
+                try:
+                    if voice_channel.guild.voice_client:
+                        await voice_channel.guild.voice_client.disconnect(force=True)
+                    voice_channel.guild._voice_client = None
+                    await asyncio.sleep(3)
+                except:
+                    pass
+            logger.error(f"Voice connection attempt {attempt + 1} failed: {e}")
+            
+        except Exception as e:
+            logger.error(f"Voice connection attempt {attempt + 1} failed: {e}")
+            
+        if attempt < max_retries - 1:
+            delay = initial_delay * (2 ** attempt)
+            logger.info(f"Retrying in {delay}s...")
+            await asyncio.sleep(delay)
+    
+    logger.warning(f"Failed to connect to voice channel after {max_retries} attempts - this may be due to cloud hosting limitations")
+    return None
+
+# =============================================================================
+# UI COMPONENTS AND MODALS
+# =============================================================================
+
+class PinModal(discord.ui.Modal, title="Enter PIN"):
+    def __init__(self, callback, *args, **kwargs):
+        super().__init__()
+        self.callback = callback
+        self.args = args
+        self.kwargs = kwargs
+        self.pin = discord.ui.TextInput(
+            label="4-Digit PIN",
+            placeholder="Enter the master PIN",
+            min_length=4,
+            max_length=4,
+            required=True
+        )
+        self.add_item(self.pin)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        if PinManager.verify_pin(self.pin.value):
+            try:
+                await self.callback(interaction, *self.args, **self.kwargs)
+            except Exception as e:
+                logger.error(f"Pin modal callback error: {e}")
+                embed = create_error_embed("Error", f"Operation failed: {str(e)}")
+                await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            embed = create_error_embed("Invalid PIN", "The entered PIN is incorrect.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+class MusicControlView(discord.ui.View):
+    def __init__(self, bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.last_interaction = time.time()
+
+    async def _safe_interaction_response(self, interaction: discord.Interaction, content: str = "", embed: discord.Embed = None, ephemeral: bool = True, view: discord.ui.View = None):
+        try:
+            if interaction.response.is_done():
+                if embed:
+                    await interaction.followup.send(embed=embed, ephemeral=ephemeral, view=view)
+                else:
+                    await interaction.followup.send(content, ephemeral=ephemeral, view=view)
+            else:
+                if embed:
+                    await interaction.response.send_message(embed=embed, ephemeral=ephemeral, view=view)
+                else:
+                    await interaction.response.send_message(content, ephemeral=ephemeral, view=view)
+        except discord.errors.NotFound:
+            logger.warning("Interaction token expired or invalid")
+        except Exception as e:
+            logger.error(f"Error responding to interaction: {e}")
+
+    @discord.ui.button(label="⏸️ Pause", style=discord.ButtonStyle.secondary, row=0)
+    async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            voice_client = interaction.guild.voice_client
+            if voice_client and voice_client.is_playing():
+                voice_client.pause()
+                embed = create_success_embed("⏸️ Paused", "The music has been paused, nya!")
+                await self._safe_interaction_response(interaction, embed=embed)
+            else:
+                embed = create_error_embed("No Music Playing", "No tunes to pause, nya! Queue something up!")
+                await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Pause button error: {e}")
+            embed = create_error_embed("Error", "Failed to pause the music, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="▶️ Resume", style=discord.ButtonStyle.green, row=0)
+    async def resume_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            voice_client = interaction.guild.voice_client
+            if voice_client and voice_client.is_paused():
+                voice_client.resume()
+                embed = create_success_embed("▶️ Resumed", "Back in the race, nya! Music resumed!")
+                await self._safe_interaction_response(interaction, embed=embed)
+            else:
+                embed = create_error_embed("No Paused Music", "Nothing paused to resume, nya! Hit play first!")
+                await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Resume button error: {e}")
+            embed = create_error_embed("Error", "Failed to resume the music, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="⏭️ Skip", style=discord.ButtonStyle.primary, row=0)
+    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            voice_client = interaction.guild.voice_client
+            if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+                voice_client.stop()
+                embed = create_success_embed("⏭️ Skipped", "Drifted to the next song, nya!")
+                await self._safe_interaction_response(interaction, embed=embed)
+            else:
+                embed = create_error_embed("No Music Playing", "No song to skip, nya! Queue something up!")
+                await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Skip button error: {e}")
+            embed = create_error_embed("Error", "Failed to skip the song, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="🔀 Shuffle", style=discord.ButtonStyle.secondary, row=0)
+    async def shuffle_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            guild_id = interaction.guild.id
+            queue = self.bot.queues.get(guild_id, [])
+            if len(queue) <= 1:
+                embed = create_error_embed("Not Enough Songs", "Need at least 2 songs to shuffle, nya! Add more to the queue!")
+                await self._safe_interaction_response(interaction, embed=embed)
+                return
+            random.shuffle(queue)
+            self.bot.queues[guild_id] = queue
+            embed = create_success_embed("🔀 Shuffled", f"Mixed up {len(queue)} songs in the queue, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Shuffle button error: {e}")
+            embed = create_error_embed("Error", "Failed to shuffle the queue, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="📜 Queue", style=discord.ButtonStyle.secondary, row=1)
+    async def queue_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            guild_id = interaction.guild.id
+            queue = self.bot.queues.get(guild_id, [])
+            if not queue:
+                embed = create_error_embed("Queue Empty", "No songs in the queue, nya! Add some tunes!")
+                await self._safe_interaction_response(interaction, embed=embed)
+                return
+            queue_text = "\n".join(f"{i+1}. **{song['title']}**" for i, song in enumerate(queue[:10]))
+            if len(queue) > 10:
+                queue_text += f"\n... and {len(queue) - 10} more songs"
+            embed = create_embed("📜 Current Queue", queue_text)
+            embed.add_field(name="Total Songs", value=str(len(queue)), inline=True)
+            await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Queue button error: {e}")
+            embed = create_error_embed("Error", "Failed to display queue, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="⏹️ Stop", style=discord.ButtonStyle.danger, row=1)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            guild_id = interaction.guild.id
+            voice_client = interaction.guild.voice_client
+            if voice_client:
+                voice_client.stop()
+                await voice_client.disconnect(force=True)
+            if guild_id in self.bot.queues:
+                self.bot.queues[guild_id].clear()
+            embed = create_success_embed("⏹️ Stopped", "Music stopped and queue cleared, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Stop button error: {e}")
+            embed = create_error_embed("Error", "Failed to stop music, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="📚 History", style=discord.ButtonStyle.secondary, row=2)
+    async def history_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            if not db_manager:
+                embed = create_error_embed("Database Error", "Database is not available, nya!")
+                await self._safe_interaction_response(interaction, embed=embed)
+                return
+            session = db_manager.get_session()
+            try:
+                recent_plays = session.query(PlayHistory)\
+                    .filter(PlayHistory.guild_id == interaction.guild.id)\
+                    .order_by(PlayHistory.played_at.desc())\
+                    .limit(10).all()
+                if not recent_plays:
+                    embed = create_embed("📚 Play History", "No songs have been played recently, nya!")
+                else:
+                    history_text = "\n".join(f"🎵 **{play.title}** - {play.played_at.strftime('%m/%d %H:%M')}" for play in recent_plays)
+                    embed = create_embed("📚 Recent Play History", history_text)
+                await self._safe_interaction_response(interaction, embed=embed)
+            finally:
+                session.close()
+        except Exception as e:
+            logger.error(f"History button error: {e}")
+            embed = create_error_embed("Error", "Failed to display play history, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="📊 Stats", style=discord.ButtonStyle.secondary, row=2)
+    async def stats_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            if not db_manager:
+                embed = create_error_embed("Database Error", "Database is not available, nya!")
+                await self._safe_interaction_response(interaction, embed=embed)
+                return
+            stats = db_manager.get_guild_stats(interaction.guild.id)
+            embed = create_embed("📊 Server Statistics", "Bot usage in this server, nya:")
+            embed.add_field(name="Commands Used", value=stats['total_commands'], inline=True)
+            embed.add_field(name="Songs Played", value=stats['total_plays'], inline=True)
+            embed.add_field(name="Searches Made", value=stats['total_searches'], inline=True)
+            cache_stats = await cache_manager.get_cache_stats()
+            embed.add_field(name="Songs Cached", value=cache_stats.get('total_songs', 0), inline=True)
+            embed.add_field(name="Cache Size", value=f"{cache_stats.get('total_size_gb', 0)}GB", inline=True)
+            await self._safe_interaction_response(interaction, embed=embed)
+        except Exception as e:
+            logger.error(f"Stats button error: {e}")
+            embed = create_error_embed("Error", "Failed to display stats, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+    @discord.ui.button(label="🗑️ Clear Cache", style=discord.ButtonStyle.danger, row=2)
+    async def clear_cache_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        async def clear_cache_with_pin(interaction):
+            try:
+                await cache_manager.clear_cache()
+                embed = create_success_embed("🗑️ Cache Cleared", "All cached songs have been removed, nya!")
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except Exception as e:
+                logger.error(f"Clear cache error: {e}")
+                embed = create_error_embed("Error", "Failed to clear cache, nya!")
+                await interaction.followup.send(embed=embed, ephemeral=True)
+        
+        modal = PinModal(clear_cache_with_pin)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="🎵 Local Songs", style=discord.ButtonStyle.secondary, row=3)
+    async def local_songs_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            local_mgr = get_local_songs_manager()
+            songs = local_mgr.get_songs()
+            if not songs:
+                embed = create_embed("🎵 Local Songs", "No local songs available, nya! Cache some tunes first!")
+                await self._safe_interaction_response(interaction, embed=embed)
+                return
+            
+            song_list = "\n".join(f"🎵 **{song['title']}** ({song.get('genre', 'Unknown')})" for song in songs[:10])
+            if len(songs) > 10:
+                song_list += f"\n... and {len(songs) - 10} more songs"
+            embed = create_embed("🎵 Local Songs", song_list)
+            embed.add_field(name="Total Songs", value=str(len(songs)), inline=True)
+            
+            if len(songs) > 0:
+                select = discord.ui.Select(
+                    placeholder="Select a song to play",
+                    options=[discord.SelectOption(
+                        label=s['title'][:100], 
+                        value=str(i),
+                        description=f"Genre: {s.get('genre', 'Unknown')}"[:100]
+                    ) for i, s in enumerate(songs[:25])]
+                )
+                
+                async def select_callback(select_interaction: discord.Interaction):
+                    song_index = int(select.values[0])
+                    song = songs[song_index]
+                    
+                    if isinstance(select_interaction.user, discord.Member) and select_interaction.user.voice:
+                        guild_id = select_interaction.guild.id
+                        if guild_id not in self.bot.queues:
+                            self.bot.queues[guild_id] = []
+                        
+                        queue_entry = QueueEntry(
+                            title=song['title'],
+                            url=song['file_path'],
+                            duration=song.get('duration'),
+                            thumbnail=None,
+                            requested_by=select_interaction.user.display_name,
+                            uploader="Local File",
+                            platform="local"
+                        )
+                        
+                        self.bot.queues[guild_id].append(queue_entry)
+                        embed = create_success_embed("🎵 Song Queued", f"Added **{song['title']}** to the queue, nya!")
+                        
+                        try:
+                            voice_channel = select_interaction.user.voice.channel
+                            voice = await robust_voice_connect(voice_channel, self.bot)
+                            if voice and not voice.is_playing() and not voice.is_paused():
+                                await self.bot.play_next(guild_id)
+                        except Exception as voice_error:
+                            logger.warning(f"Voice connection failed but song queued: {voice_error}")
+                        
+                        await select_interaction.response.send_message(embed=embed, ephemeral=True)
+                    else:
+                        embed = create_error_embed("Error", "You must be in a voice channel to play music, nya!")
+                        await select_interaction.response.send_message(embed=embed, ephemeral=True)
+                
+                select.callback = select_callback
+                view = discord.ui.View()
+                view.add_item(select)
+                await self._safe_interaction_response(interaction, embed=embed, view=view)
+            else:
+                await self._safe_interaction_response(interaction, embed=embed)
+                
+        except Exception as e:
+            logger.error(f"Local songs button error: {e}")
+            embed = create_error_embed("Error", f"Failed to display local songs: {str(e)}, nya!")
+            await self._safe_interaction_response(interaction, embed=embed)
+
+class PlayModal(discord.ui.Modal, title="Play Music"):
+    def __init__(self, bot):
+        super().__init__()
+        self.bot = bot
+        self.query = discord.ui.TextInput(
+            label="Song/URL/Playlist",
+            placeholder="Enter song name, YouTube URL, or playlist URL",
+            min_length=1,
+            max_length=500,
+            required=True
+        )
+        self.add_item(self.query)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.bot.play_command_impl(interaction, self.query.value)
+
+# =============================================================================
+# MAIN BOT CLASS
+# =============================================================================
+
+@dataclass
+class QueueEntry:
+    title: str
+    url: str
+    duration: Optional[int]
+    thumbnail: Optional[str]
+    requested_by: str
+    uploader: Optional[str] = None
+    platform: str = "youtube"
+    added_at: datetime = None
+
+    def __post_init__(self):
+        if self.added_at is None:
+            self.added_at = datetime.now(timezone.utc)
+
+class MusicBot(commands.Bot):
+    def __init__(self, config: BotConfig):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.voice_states = True
+        
+        super().__init__(
+            command_prefix='!',
+            intents=intents,
+            help_command=None
+        )
+        
+        self.config = config
+        self.queues: Dict[int, List[QueueEntry]] = {}
+        self.current_songs: Dict[int, Optional[QueueEntry]] = {}
+        self.bot_voice_clients: Dict[int, discord.VoiceClient] = {}
+        self.loop_modes: Dict[int, str] = {}  # 'off', 'track', 'queue'
+        self.volumes: Dict[int, float] = {}
+        self.auto_disconnect_tasks: Dict[int, asyncio.Task] = {}
+
+    async def setup_hook(self):
+        """Setup hook called when bot is starting"""
+        logger.info("Setting up bot...")
+        
+        if not init_database():
+            logger.error("Failed to initialize database")
+            sys.exit(1)
+        
+        await self._register_commands()
+        
+        try:
+            synced = await self.tree.sync()
+            logger.info(f"Successfully synced {len(synced)} slash command(s)")
+            for cmd in synced:
+                logger.info(f"Synced command: {cmd.name}")
+        except Exception as e:
+            logger.error(f"Command sync failed: {e}")
+
+    async def _register_commands(self):
+        """Manually register commands to ensure they're added to the tree"""
+        logger.info("Registering commands manually...")
+        
+        @app_commands.command(name="ping", description="Test bot responsiveness")
+        async def ping_cmd(interaction: discord.Interaction):
+            embed = create_success_embed("Pong!", "Bot is ready to race, nya!")
+            await interaction.response.send_message(embed=embed)
+        
+        @app_commands.command(name="menu", description="Show music control panel")
+        async def menu_cmd(interaction: discord.Interaction):
+            await self._menu_command_impl(interaction)
+        
+        @app_commands.command(name="play", description="Play a song")
+        async def play_cmd(interaction: discord.Interaction, query: str):
+            await self._play_command_impl(interaction, query)
+        
+        @app_commands.command(name="stop", description="Stop music and clear queue")
+        async def stop_cmd(interaction: discord.Interaction):
+            await self._stop_command_impl(interaction)
+        
+        @app_commands.command(name="queue", description="Show current queue")
+        async def queue_cmd(interaction: discord.Interaction):
+            await self._queue_command_impl(interaction)
+        
+        self.tree.add_command(ping_cmd)
+        self.tree.add_command(menu_cmd)
+        self.tree.add_command(play_cmd)
+        self.tree.add_command(stop_cmd)
+        self.tree.add_command(queue_cmd)
+        
+        logger.info(f"Added {len(self.tree.get_commands())} commands to tree")
+
+    async def _menu_command_impl(self, interaction: discord.Interaction):
+        """Menu command implementation"""
+        try:
+            guild_id = interaction.guild.id
+            voice_client = self.bot_voice_clients.get(guild_id)
+            current_song = self.current_songs.get(guild_id)
+            queue = self.queues.get(guild_id, [])
+            
+            if current_song:
+                embed = create_embed(
+                    "🎵 Music Control Panel",
+                    f"**Now Playing:** {current_song.title}\n"
+                    f"**Requested by:** {current_song.requested_by}\n"
+                    f"**Queue:** {len(queue)} song(s)\n\n"
+                    f"Use the buttons below to control playback, nya!"
+                )
+                if current_song.thumbnail:
+                    embed.set_thumbnail(url=current_song.thumbnail)
+            else:
+                embed = create_embed(
+                    "🎵 Music Control Panel",
+                    "No music currently playing, nya!\n\n"
+                    "Use `/play <song>` to start the show!\n"
+                    "Use the buttons below for other controls."
+                )
+            
+            if queue:
+                queue_text = ""
+                for i, song in enumerate(queue[:5], 1):
+                    queue_text += f"{i}. {song.title}\n"
+                if len(queue) > 5:
+                    queue_text += f"... and {len(queue) - 5} more"
+                embed.add_field(name="🎶 Up Next", value=queue_text, inline=False)
+            
+            view = MusicControlView(self)
+            await interaction.response.send_message(embed=embed, view=view)
+            
+        except Exception as e:
+            logger.error(f"Menu command error: {e}")
+            embed = create_error_embed("Error", "Failed to display control panel, nya!")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _play_command_impl(self, interaction: discord.Interaction, query: str):
+        """Play command implementation—tuned like a B-Series VTEC, nya!"""
+        start_time = time.perf_counter()  # Precision timing for the quarter-mile!
+        
+        guild_id = interaction.guild.id if interaction.guild else -1  # Define upfront to avoid UnboundLocalError
+        
+        try:
+            await interaction.response.defer(ephemeral=True)  # Defer to avoid timeout
+            
+            if not interaction.guild:
+                embed = create_error_embed("Error", "This bot lives for servers, nya! Join a Discord server to crank the tunes!")
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+
+            if not isinstance(interaction.user, discord.Member) or not interaction.user.voice or not interaction.user.voice.channel:
+                embed = create_error_embed("Error", "You gotta be in a voice channel to jam, nya! Join one and let’s race!")
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+
+            voice_channel = interaction.user.voice.channel
+
+            embed = discord.Embed(title="🔍 Searching...", description=f"Looking for: **{query}**, nya!", color=discord.Color.blue())
+            search_msg = await interaction.followup.send(embed=embed, ephemeral=False)
+
+            song_data = await self.search_youtube(query)
+            if not song_data:
+                embed = create_error_embed("Not Found", f"Couldn’t find **{query}**, nya! Try another tune!")
+                await search_msg.edit(embed=embed)
+                return
+
+            if db_manager:
+                db_manager.add_search_history(guild_id, interaction.user.id, query, 1)
+                db_manager.add_play_history(guild_id, interaction.user.id, song_data)
+
+            voice_client = await robust_voice_connect(voice_channel, self)
+            if not voice_client:
+                embed = create_error_embed("Connection Failed", "Couldn’t connect to the voice channel, nya! Check bot permissions!")
+                await search_msg.edit(embed=embed)
+                return
+
+            self.bot_voice_clients[guild_id] = voice_client
+            logger.info(f"Connected to voice channel: {voice_channel.name}, ready to drop the beat, nya!")
+
+            queue_entry = QueueEntry(
+                title=song_data['title'],
+                url=song_data['url'],
+                duration=song_data.get('duration'),
+                thumbnail=song_data.get('thumbnail'),
+                requested_by=interaction.user.display_name,
+                uploader=song_data.get('uploader'),
+                platform=song_data.get('platform', 'youtube')
+            )
+
+            if guild_id not in self.queues:
+                self.queues[guild_id] = []
+            
+            is_playing = voice_client.is_playing() or voice_client.is_paused()
+            if is_playing:
+                self.queues[guild_id].append(queue_entry)
+                position = len(self.queues[guild_id])
+                embed = create_success_embed(
+                    "Added to Queue",
+                    f"**{queue_entry.title}**\nPosition: #{position}\nRequested by: {queue_entry.requested_by}, nya!"
+                )
+                if queue_entry.thumbnail:
+                    embed.set_thumbnail(url=queue_entry.thumbnail)
+                await search_msg.edit(embed=embed)
+            else:
+                await self.play_song(guild_id, queue_entry)
+                embed = create_success_embed(
+                    "Now Playing",
+                    f"**{queue_entry.title}**\nRequested by: {queue_entry.requested_by}, nya!"
+                )
+                if queue_entry.thumbnail:
+                    embed.set_thumbnail(url=queue_entry.thumbnail)
+                await search_msg.edit(embed=embed)
+
+            execution_time = time.perf_counter() - start_time
+            if db_manager:
+                db_manager.add_command_stat(guild_id, interaction.user.id, "play", True, None, execution_time)
+                logger.info(f"Play command executed in {execution_time:.2f}s, nya!")
+
+        except Exception as e:
+            execution_time = time.perf_counter() - start_time
+            if db_manager:
+                db_manager.add_command_stat(guild_id, interaction.user.id, "play", False, str(e), execution_time)
+            
+            embed = create_error_embed("Error", f"Crashed harder than a ricer at a drift meet, nya! Error: {str(e)}")
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except discord.errors.NotFound:
+                logger.warning("Interaction token expired, couldn’t send error message, nya!")
+            except Exception as followup_error:
+                logger.error(f"Failed to send error message: {followup_error}, nya!")
+            
+            logger.error(f"Play command crashed: {e}, nya!")
+
+    async def _stop_command_impl(self, interaction: discord.Interaction):
+        """Stop command implementation"""
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        if voice_client:
+            if voice_client.is_playing() or voice_client.is_paused():
+                voice_client.stop()
+            await voice_client.disconnect()
+            if guild_id in self.bot_voice_clients:
+                del self.bot_voice_clients[guild_id]
+        
+        if guild_id in self.queues:
+            self.queues[guild_id] = []
+        
+        if guild_id in self.current_songs:
+            del self.current_songs[guild_id]
+        
+        embed = create_success_embed("Stopped", "Stopped playing and cleared the queue, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    async def _queue_command_impl(self, interaction: discord.Interaction):
+        """Queue command implementation"""
+        guild_id = interaction.guild.id
+        current_song = self.current_songs.get(guild_id)
+        queue = self.queues.get(guild_id, [])
+
+        embed = discord.Embed(title="🎵 Music Queue", color=discord.Color.blue())
+
+        if current_song:
+            embed.add_field(
+                name="🎶 Now Playing",
+                value=f"**{current_song.title}**\nRequested by: {current_song.requested_by}",
+                inline=False
+            )
+
+        if queue:
+            queue_text = ""
+            for i, song in enumerate(queue[:10], 1):
+                queue_text += f"{i}. **{song.title}**\n   Requested by: {song.requested_by}\n"
+            
+            if len(queue) > 10:
+                queue_text += f"\n... and {len(queue) - 10} more songs"
+            
+            embed.add_field(name="🔜 Up Next", value=queue_text, inline=False)
+        else:
+            embed.add_field(name="🔜 Queue", value="The queue is empty, nya!", inline=False)
+
+        embed.set_footer(text=f"Total songs in queue: {len(queue)}")
+        await interaction.response.send_message(embed=embed)
+
+    async def on_ready(self):
+        """Called when bot is ready"""
+        logger.info(f"{self.user} has connected to Discord, nya!")
+        logger.info(f"Bot is in {len(self.guilds)} guilds")
+        
+        if db_manager:
+            for guild in self.guilds:
+                db_manager.get_or_create_guild(guild.id, guild.name)
+
+    async def on_guild_join(self, guild):
+        """Called when bot joins a new guild"""
+        logger.info(f"Joined new guild: {guild.name} ({guild.id}), nya!")
+        if db_manager:
+            db_manager.get_or_create_guild(guild.id, guild.name)
+
+    async def search_youtube(self, query: str) -> Optional[Dict]:
+        """Search YouTube for a song with multiple fallback methods"""
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'default_search': 'ytsearch5:',
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    search_results = ydl.extract_info(query, download=False)
+                    if search_results and 'entries' in search_results and search_results['entries']:
+                        entry = search_results['entries'][0]
+                        return {
+                            'title': entry.get('title', 'Unknown'),
+                            'url': entry.get('url', ''),
+                            'id': entry.get('id', ''),
+                            'duration': entry.get('duration'),
+                            'uploader': entry.get('uploader', 'Unknown'),
+                            'thumbnail': entry.get('thumbnail'),
+                            'platform': 'youtube'
+                        }
+                except Exception as e:
+                    logger.warning(f"yt-dlp search failed: {e}")
+
+            if self.config.youtube_api_key:
+                try:
+                    youtube = build('youtube', 'v3', developerKey=self.config.youtube_api_key)
+                    search_response = youtube.search().list(
+                        q=query,
+                        part='snippet',
+                        maxResults=1,
+                        type='video'
+                    ).execute()
+
+                    if search_response['items']:
+                        item = search_response['items'][0]
+                        video_id = item['id']['videoId']
+                        return {
+                            'title': item['snippet']['title'],
+                            'url': f"https://www.youtube.com/watch?v={video_id}",
+                            'id': video_id,
+                            'uploader': item['snippet']['channelTitle'],
+                            'thumbnail': item['snippet']['thumbnails'].get('medium', {}).get('url'),
+                            'platform': 'youtube'
+                        }
+                except HttpError as e:
+                    logger.warning(f"YouTube API search failed: {e}")
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return None
+
+    async def get_audio_source(self, url: str) -> Optional[str]:
+        """Get audio source URL from YouTube video"""
+        try:
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'quiet': True,
+                'no_warnings': True,
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return info.get('url')
+        except Exception as e:
+            logger.error(f"Failed to get audio source: {e}")
+            return None
+
+    async def search_media(self, query: str, guild_id: int, playlist: bool = False, user_id: int = 0) -> List[Dict[str, Any]]:
+        """Enhanced search with multiple fallback methods"""
+        try:
+            if db_manager:
+                db_manager.add_search_history(guild_id, user_id, query)
+            
+            results = []
+            
+            try:
+                ydl_opts = {
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': True,
+                    'default_search': 'ytsearch10:' if not playlist else 'ytplaylist:'
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    search_query = f"ytsearch10:{query}" if not playlist else query
+                    info = ydl.extract_info(search_query, download=False)
+                    
+                    if info and 'entries' in info:
+                        for entry in info['entries'][:10]:
+                            if entry:
+                                results.append({
+                                    'title': entry.get('title', 'Unknown'),
+                                    'url': entry.get('webpage_url', entry.get('url', '')),
+                                    'id': entry.get('id', ''),
+                                    'duration': entry.get('duration'),
+                                    'uploader': entry.get('uploader', 'Unknown'),
+                                    'thumbnail': entry.get('thumbnail'),
+                                    'platform': 'youtube'
+                                })
+            except Exception as e:
+                logger.warning(f"yt-dlp search failed: {e}")
+            
+            if not results and self.config.youtube_api_key:
+                try:
+                    youtube = build('youtube', 'v3', developerKey=self.config.youtube_api_key)
+                    search_response = youtube.search().list(
+                        q=query,
+                        part='snippet',
+                        maxResults=10,
+                        type='video'
+                    ).execute()
+                    
+                    for item in search_response['items']:
+                        video_id = item['id']['videoId']
+                        results.append({
+                            'title': item['snippet']['title'],
+                            'url': f"https://www.youtube.com/watch?v={video_id}",
+                            'id': video_id,
+                            'uploader': item['snippet']['channelTitle'],
+                            'thumbnail': item['snippet']['thumbnails'].get('medium', {}).get('url'),
+                            'platform': 'youtube'
+                        })
+                except HttpError as e:
+                    logger.warning(f"YouTube API search failed: {e}")
+            
+            return results[:10]
+            
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return []
+
+    async def process_playlist(self, url: str) -> List[Dict[str, Any]]:
+        """Process YouTube playlist"""
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'playlist_items': '1:50'
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                
+                if info and 'entries' in info:
+                    playlist_songs = []
+                    for entry in info['entries'][:50]:
+                        if entry:
+                            playlist_songs.append({
+                                'title': entry.get('title', 'Unknown'),
+                                'url': entry.get('webpage_url', entry.get('url', '')),
+                                'id': entry.get('id', ''),
+                                'duration': entry.get('duration'),
+                                'uploader': entry.get('uploader', 'Unknown'),
+                                'thumbnail': entry.get('thumbnail'),
+                                'platform': 'youtube'
+                            })
+                    return playlist_songs
+                    
+        except Exception as e:
+            logger.error(f"Playlist processing failed: {e}")
+            
+        return []
+
+    async def play_song(self, guild_id: int, queue_entry: QueueEntry):
+        """Play a song"""
+        try:
+            voice_client = self.bot_voice_clients.get(guild_id)
+            if not voice_client:
+                return
+
+            self.current_songs[guild_id] = queue_entry
+
+            cache_manager = get_cache_manager()
+            cached_path = await cache_manager.is_cached(queue_entry.url)
+            
+            if cached_path and cached_path.exists():
+                logger.info(f"Using cached audio: {queue_entry.title}")
+                audio_source = discord.FFmpegPCMAudio(
+                    str(cached_path),
+                    executable=self.config.ffmpeg_executable,
+                    before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+                )
+            else:
+                audio_url = await self.get_audio_source(queue_entry.url)
+                if not audio_url:
+                    logger.error(f"Could not get audio source for: {queue_entry.title}")
+                    await self.play_next(guild_id)
+                    return
+
+                audio_source = discord.FFmpegPCMAudio(
+                    audio_url,
+                    executable=self.config.ffmpeg_executable,
+                    before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+                )
+
+            volume = self.volumes.get(guild_id, self.config.default_volume)
+            audio_source = discord.PCMVolumeTransformer(audio_source, volume=volume)
+
+            voice_client.play(
+                audio_source,
+                after=lambda error: asyncio.run_coroutine_threadsafe(
+                    self.song_finished(guild_id, error), self.loop
+                )
+            )
+
+            logger.info(f"Now playing: {queue_entry.title}")
+
+            if guild_id in self.auto_disconnect_tasks:
+                self.auto_disconnect_tasks[guild_id].cancel()
+                del self.auto_disconnect_tasks[guild_id]
+
+        except Exception as e:
+            logger.error(f"Error playing song: {e}")
+            await self.play_next(guild_id)
+
+    async def play_next(self, guild_id: int):
+        """Play the next song in queue"""
+        try:
+            voice_client = self.bot_voice_clients.get(guild_id)
+            if not voice_client:
+                return
+
+            current_song = self.current_songs.get(guild_id)
+            loop_mode = self.loop_modes.get(guild_id, 'off')
+
+            if loop_mode == 'track' and current_song:
+                await self.play_song(guild_id, current_song)
+                return
+
+            if guild_id in self.queues and self.queues[guild_id]:
+                next_song = self.queues[guild_id].pop(0)
+                
+                if loop_mode == 'queue' and current_song:
+                    self.queues[guild_id].append(current_song)
+
+                await self.play_song(guild_id, next_song)
+            else:
+                self.current_songs[guild_id] = None
+                
+                if guild_id not in self.auto_disconnect_tasks:
+                    self.auto_disconnect_tasks[guild_id] = asyncio.create_task(
+                        self._auto_disconnect_after_delay(guild_id)
+                    )
+
+        except Exception as e:
+            logger.error(f"Error playing next song: {e}")
+
+    async def song_finished(self, guild_id: int, error):
+        """Called when a song finishes playing"""
+        if error:
+            logger.error(f"Player error: {error}")
+        
+        await self.play_next(guild_id)
+
+    async def _auto_disconnect_after_delay(self, guild_id: int):
+        """Disconnect after delay if still idle"""
+        try:
+            await asyncio.sleep(self.config.auto_disconnect_delay)
+            
+            voice_client = self.bot_voice_clients.get(guild_id)
+            if voice_client and not voice_client.is_playing():
+                logger.info(f"Auto-disconnecting from guild {guild_id} after {self.config.auto_disconnect_delay}s of inactivity")
+                await voice_client.disconnect()
+                if guild_id in self.bot_voice_clients:
+                    del self.bot_voice_clients[guild_id]
+                if guild_id in self.auto_disconnect_tasks:
+                    del self.auto_disconnect_tasks[guild_id]
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Auto-disconnect error: {e}")
+
+    # =============================================================================
+    # SLASH COMMANDS
+    # =============================================================================
+
+    @app_commands.command(name="ping", description="Test bot responsiveness")
+    async def ping(self, interaction: discord.Interaction):
+        """Simple ping command to test bot responsiveness"""
+        embed = create_success_embed("Pong!", "Bot is ready to race, nya! I live my life a quarter-mile at a time!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="play", description="Play a song or add it to the queue")
+    async def play(self, interaction: discord.Interaction, query: str):
+        """Play command"""
+        await self.play_command_impl(interaction, query)
+
+    @app_commands.command(name="skip", description="Skip the current song")
+    async def skip(self, interaction: discord.Interaction):
+        """Skip command"""
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        if not voice_client or not voice_client.is_connected():
+            embed = create_error_embed("Error", "Bot’s not in a voice channel, nya! Connect me first!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        if not voice_client.is_playing() and not voice_client.is_paused():
+            embed = create_error_embed("Error", "No tunes spinning to skip, nya! Queue something up!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        current_song = self.current_songs.get(guild_id)
+        song_title = current_song.title if current_song else "Unknown"
+        
+        voice_client.stop()
+        
+        embed = create_success_embed("Skipped", f"Drifted past **{song_title}**, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="pause", description="Pause the current song")
+    async def pause(self, interaction: discord.Interaction):
+        """Pause command"""
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        if not voice_client or not voice_client.is_playing():
+            embed = create_error_embed("Error", "Nothing’s playing to pause, nya! Drop a track first!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        voice_client.pause()
+        current_song = self.current_songs.get(guild_id)
+        song_title = current_song.title if current_song else "Unknown"
+        
+        embed = create_success_embed("Paused", f"Paused **{song_title}**, nya! Taking a pit stop!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="resume", description="Resume the paused song")
+    async def resume(self, interaction: discord.Interaction):
+        """Resume command"""
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        if not voice_client or not voice_client.is_paused():
+            embed = create_error_embed("Error", "No paused tracks to resume, nya! Hit play first!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        voice_client.resume()
+        current_song = self.current_songs.get(guild_id)
+        song_title = current_song.title if current_song else "Unknown"
+        
+        embed = create_success_embed("Resumed", f"Back in the race with **{song_title}**, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="stop", description="Stop playing and clear the queue")
+    async def stop(self, interaction: discord.Interaction):
+        """Stop command"""
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        if not voice_client:
+            embed = create_error_embed("Error", "Bot’s not in a voice channel, nya! Connect me first!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        if voice_client.is_playing() or voice_client.is_paused():
+            voice_client.stop()
+        
+        if guild_id in self.queues:
+            self.queues[guild_id].clear()
+        self.current_songs[guild_id] = None
+        
+        embed = create_success_embed("Stopped", "Slammed the brakes and cleared the queue, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="volume", description="Set the playback volume (0-100)")
+    async def volume(self, interaction: discord.Interaction, volume: int):
+        """Volume command"""
+        if not 0 <= volume <= 100:
+            embed = create_error_embed("Error", "Volume’s gotta be between 0 and 100, nya! Don’t blow the speakers!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        volume_float = volume / 100.0
+        self.volumes[guild_id] = volume_float
+        
+        if voice_client and voice_client.source:
+            voice_client.source.volume = volume_float
+        
+        embed = create_success_embed("Volume Set", f"Cranked the volume to **{volume}%**, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="queue", description="Show the current queue")
+    async def queue(self, interaction: discord.Interaction):
+        """Queue command"""
+        guild_id = interaction.guild.id
+        current_song = self.current_songs.get(guild_id)
+        queue = self.queues.get(guild_id, [])
+
+        embed = discord.Embed(title="🎵 Music Queue", color=discord.Color.blue())
+
+        if current_song:
+            embed.add_field(
+                name="🎶 Now Playing",
+                value=f"**{current_song.title}**\nRequested by: {current_song.requested_by}",
+                inline=False
+            )
+
+        if queue:
+            queue_text = ""
+            for i, song in enumerate(queue[:10], 1):
+                duration_str = f" ({song.duration}s)" if song.duration else ""
+                queue_text += f"**{i}.** {song.title}{duration_str}\n"
+            
+            if len(queue) > 10:
+                queue_text += f"\n... and {len(queue) - 10} more songs"
+            
+            embed.add_field(name="🔜 Up Next", value=queue_text, inline=False)
+        else:
+            embed.add_field(name="🔜 Up Next", value="Queue’s empty, nya! Add some bangers!", inline=False)
+
+        embed.set_footer(text=f"Total songs in queue: {len(queue)}")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="nowplaying", description="Show currently playing song info")
+    async def nowplaying(self, interaction: discord.Interaction):
+        """Now playing command"""
+        guild_id = interaction.guild.id
+        current_song = self.current_songs.get(guild_id)
+        voice_client = self.bot_voice_clients.get(guild_id)
+
+        if not current_song:
+            embed = create_error_embed("Nothing Playing", "No song’s spinning right now, nya!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        embed = discord.Embed(title="🎶 Now Playing", color=discord.Color.green())
+        embed.add_field(name="Title", value=current_song.title, inline=False)
+        embed.add_field(name="Requested by", value=current_song.requested_by, inline=True)
+        
+        if current_song.uploader:
+            embed.add_field(name="Channel", value=current_song.uploader, inline=True)
+        
+        if current_song.duration:
+            embed.add_field(name="Duration", value=f"{current_song.duration}s", inline=True)
+
+        status = "⏸️ Paused" if voice_client and voice_client.is_paused() else "▶️ Playing"
+        embed.add_field(name="Status", value=status, inline=True)
+
+        volume = int(self.volumes.get(guild_id, self.config.default_volume) * 100)
+        embed.add_field(name="Volume", value=f"{volume}%", inline=True)
+
+        loop_mode = self.loop_modes.get(guild_id, 'off')
+        loop_emojis = {'off': '⭕', 'track': '🔂', 'queue': '🔁'}
+        embed.add_field(name="Loop", value=f"{loop_emojis[loop_mode]} {loop_mode.title()}", inline=True)
+
+        if current_song.thumbnail:
+            embed.set_thumbnail(url=current_song.thumbnail)
+
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="disconnect", description="Disconnect the bot from voice channel")
+    async def disconnect(self, interaction: discord.Interaction):
+        """Disconnect command"""
+        guild_id = interaction.guild.id
+        voice_client = self.bot_voice_clients.get(guild_id)
+        
+        if not voice_client:
+            embed = create_error_embed("Error", "Bot’s not in a voice channel, nya! Nothing to disconnect!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        await voice_client.disconnect()
+        if guild_id in self.bot_voice_clients:
+            del self.bot_voice_clients[guild_id]
+        if guild_id in self.queues:
+            del self.queues[guild_id]
+        if guild_id in self.current_songs:
+            del self.current_songs[guild_id]
+        if guild_id in self.auto_disconnect_tasks:
+            self.auto_disconnect_tasks[guild_id].cancel()
+            del self.auto_disconnect_tasks[guild_id]
+
+        embed = create_success_embed("Disconnected", "Bot’s peeled out of the voice channel, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="clear", description="Clear the queue")
+    async def clear(self, interaction: discord.Interaction):
+        """Clear queue command"""
+        guild_id = interaction.guild.id
+        
+        if guild_id in self.queues:
+            queue_size = len(self.queues[guild_id])
+            self.queues[guild_id].clear()
+            embed = create_success_embed("Queue Cleared", f"Dumped {queue_size} songs from the queue, nya!")
+        else:
+            embed = create_success_embed("Queue Cleared", "Queue was already empty, nya!")
+        
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="shuffle", description="Shuffle the queue")
+    async def shuffle(self, interaction: discord.Interaction):
+        """Shuffle command"""
+        guild_id = interaction.guild.id
+        queue = self.queues.get(guild_id, [])
+        
+        if not queue:
+            embed = create_error_embed("Error", "Queue’s empty, nya! Add some tracks to shuffle!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        random.shuffle(queue)
+        embed = create_success_embed("Queue Shuffled", f"Mixed up {len(queue)} songs, nya!")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="loop", description="Set loop mode (off/track/queue)")
+    @app_commands.describe(mode="Loop mode: off, track, or queue")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="Off", value="off"),
+        app_commands.Choice(name="Track", value="track"),
+        app_commands.Choice(name="Queue", value="queue")
+    ])
+    async def loop(self, interaction: discord.Interaction, mode: str):
+        """Loop command"""
+        guild_id = interaction.guild.id
+        self.loop_modes[guild_id] = mode
+        
+        mode_emojis = {'off': '⭕', 'track': '🔂', 'queue': '🔁'}
+        embed = create_success_embed(
+            "Loop Mode Changed", 
+            f"{mode_emojis[mode]} Loop mode set to: **{mode.title()}**, nya!"
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="remove", description="Remove a song from the queue")
+    async def remove(self, interaction: discord.Interaction, position: int):
+        """Remove song from queue"""
+        guild_id = interaction.guild.id
+        queue = self.queues.get(guild_id, [])
+        
+        if not queue:
+            embed = create_error_embed("Error", "Queue’s empty, nya! Nothing to remove!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        if not 1 <= position <= len(queue):
+            embed = create_error_embed("Error", f"Position must be between 1 and {len(queue)}, nya!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        removed_song = queue.pop(position - 1)
+        embed = create_success_embed(
+            "Song Removed", 
+            f"Kicked **{removed_song.title}** from position {position}, nya!"
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="search", description="Search for songs without playing")
+    async def search(self, interaction: discord.Interaction, query: str, count: int = 5):
+        """Search command"""
+        if not 1 <= count <= 10:
+            count = 5
+
+        await interaction.response.defer()
+        
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'default_search': f'ytsearch{count}:',
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                search_results = ydl.extract_info(query, download=False)
+                
+                if not search_results or 'entries' not in search_results:
+                    embed = create_error_embed("No Results", f"No results found for: **{query}**, nya!")
+                    await interaction.followup.send(embed=embed)
+                    return
+
+                embed = discord.Embed(title=f"🔍 Search Results for: {query}", color=discord.Color.blue())
+                
+                for i, entry in enumerate(search_results['entries'][:count], 1):
+                    title = entry.get('title', 'Unknown')
+                    uploader = entry.get('uploader', 'Unknown')
+                    duration = entry.get('duration')
+                    duration_str = f" ({duration}s)" if duration else ""
+                    
+                    embed.add_field(
+                        name=f"{i}. {title}",
+                        value=f"Channel: {uploader}{duration_str}",
+                        inline=False
+                    )
+
+                await interaction.followup.send(embed=embed)
+                
+                if db_manager:
+                    db_manager.add_search_history(
+                        interaction.guild.id, 
+                        interaction.user.id, 
+                        query, 
+                        len(search_results['entries'])
+                    )
+
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            embed = create_error_embed("Search Error", f"Crashed during search, nya! Error: {str(e)}")
+            await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="stats", description="Show bot statistics")
+    async def stats(self, interaction: discord.Interaction):
+        """Stats command"""
+        guild_id = interaction.guild.id
+        
+        if not db_manager:
+            embed = create_error_embed("Error", "Database’s offline, nya! Can’t fetch stats!")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        try:
+            guild_stats = db_manager.get_guild_stats(guild_id)
+            cache_stats = await get_cache_manager().get_cache_stats()
+            
+            embed = discord.Embed(title="📊 Bot Statistics", color=discord.Color.blue())
+            
+            embed.add_field(
+                name="🎵 Music Stats",
+                value=f"Total plays: {guild_stats['total_plays']}\n"
+                      f"Total searches: {guild_stats['total_searches']}\n"
+                      f"Total commands: {guild_stats['total_commands']}",
+                inline=True
+            )
+            
+            if 'error' not in cache_stats:
+                embed.add_field(
+                    name="💾 Cache Stats",
+                    value=f"Cached songs: {cache_stats['total_songs']}\n"
+                          f"Cache size: {cache_stats['total_size_gb']}GB\n"
+                          f"Cache usage: {cache_stats['usage_percentage']}%",
+                    inline=True
+                )
+            
+            embed.add_field(
+                name="🤖 Bot Stats",
+                value=f"Guilds: {len(self.guilds)}\n"
+                      f"Voice connections: {len(self.bot_voice_clients)}\n"
+                      f"Active queues: {len([q for q in self.queues.values() if q])}",
+                inline=True
+            )
+            
+            await interaction.response.send_message(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Stats error: {e}")
+            embed = create_error_embed("Error", f"Failed to get stats, nya! Error: {str(e)}")
+            await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="cache", description="Manage song cache (Admin only)")
+    @app_commands.describe(action="Cache action: stats, clear")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Stats", value="stats"),
+        app_commands.Choice(name="Clear", value="clear")
+    ])
+    async def cache(self, interaction: discord.Interaction, action: str):
+        """Cache management command"""
+        if action == "clear":
+            modal = PinModal(self._cache_clear_with_pin)
+            await interaction.response.send_modal(modal)
+        else:
+            await self._cache_stats(interaction)
+
+    async def _cache_stats(self, interaction: discord.Interaction):
+        """Show cache statistics"""
+        try:
+            cache_stats = await get_cache_manager().get_cache_stats()
+            
+            if 'error' in cache_stats:
+                embed = create_error_embed("Error", cache_stats['error'])
+                await interaction.response.send_message(embed=embed)
+                return
+
+            embed = discord.Embed(title="💾 Cache Statistics", color=discord.Color.blue())
+            embed.add_field(name="Total Songs", value=cache_stats['total_songs'], inline=True)
+            embed.add_field(name="Size (MB)", value=cache_stats['total_size_mb'], inline=True)
+            embed.add_field(name="Size (GB)", value=cache_stats['total_size_gb'], inline=True)
+            embed.add_field(name="Max Size (GB)", value=cache_stats['max_size_gb'], inline=True)
+            embed.add_field(name="Usage %", value=f"{cache_stats['usage_percentage']}%", inline=True)
+            
+            usage_bar = create_progress_bar(cache_stats['usage_percentage'], 100, 20)
+            embed.add_field(name="Usage", value=f"`{usage_bar}`", inline=False)
+            
+            await interaction.response.send_message(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Cache stats error: {e}")
+            embed = create_error_embed("Error", f"Failed to get cache stats, nya! Error: {str(e)}")
+            await interaction.response.send_message(embed=embed)
+
+    async def _cache_clear_with_pin(self, interaction: discord.Interaction):
+        """Clear cache after PIN verification"""
+        try:
+            await get_cache_manager().clear_cache()
+            embed = create_success_embed("Cache Cleared", "All cached songs dumped, nya! Fresh start!")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Cache clear error: {e}")
+            embed = create_error_embed("Error", f"Failed to clear cache, nya! Error: {str(e)}")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="menu", description="Show the music control panel")
+    async def menu_command(self, interaction: discord.Interaction):
+        """Show music control panel"""
+        try:
+            guild_id = interaction.guild.id
+            
+            voice_client = self.bot_voice_clients.get(guild_id)
+            current_song = self.current_songs.get(guild_id)
+            queue = self.queues.get(guild_id, [])
+            
+            if current_song:
+                embed = create_embed(
+                    "🎵 Music Control Panel",
+                    f"**Now Playing:** {current_song.title}\n"
+                    f"**Requested by:** {current_song.requested_by}\n"
+                    f"**Queue:** {len(queue)} song(s)\n\n"
+                    f"Use the buttons below to control playback, nya!"
+                )
+                if current_song.thumbnail:
+                    embed.set_thumbnail(url=current_song.thumbnail)
+            else:
+                embed = create_embed(
+                    "🎵 Music Control Panel",
+                    "No music currently playing, nya!\n\n"
+                    "Use `/play <song>` to start the show!\n"
+                    "Use the buttons below for other controls."
+                )
+            
+            if queue:
+                queue_text = ""
+                for i, song in enumerate(queue[:5], 1):
+                    queue_text += f"{i}. {song.title}\n"
+                if len(queue) > 5:
+                    queue_text += f"... and {len(queue) - 5} more"
+                embed.add_field(name="🎶 Up Next", value=queue_text, inline=False)
+            
+            view = MusicControlView(self)
+            await interaction.response.send_message(embed=embed, view=view)
+            
+        except Exception as e:
+            logger.error(f"Menu command error: {e}")
+            embed = create_error_embed("Error", "Failed to display control panel, nya!")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# =============================================================================
+# MAIN FUNCTION
+# =============================================================================
+
+async def main():
+    """Main function to run the bot"""
+    try:
+        logger.info("🎵 Starting Enhanced Discord Music Bot, nya! Let’s burn rubber!")
+        
+        setup_logging()
+        
+        logger.info("Checking dependencies...")
+        try:
+            import yt_dlp
+            logger.info("yt-dlp is ready to rip, nya!")
+        except ImportError:
+            logger.error("yt-dlp is required but not installed, nya! Can’t race without it!")
+            return
+        
+        config = get_config()
+        
+        if not config.discord_token:
+            logger.error("Discord token not found, nya! Set DISCORD_TOKEN environment variable to start the engine!")
+            return
+        
+        logger.info("Discord token loaded, ready to roll!")
+        
+        logger.info("Checking FFmpeg installation...")
+        ffmpeg_path = ensure_ffmpeg()
+        logger.info(f"FFmpeg found at: {ffmpeg_path}, locked and loaded!")
+        
+        logger.info("Setting up Enhanced Discord Music Bot...")
+        bot = MusicBot(config)
+        
+        async with bot:
+            await bot.start(config.discord_token)
+            
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user, nya! Shutting down the engine.")
+    except Exception as e:
+        logger.error(f"Bot crashed, nya! Error: {e}")
+        raise
+
+if __name__ == "__main__":
+    asyncio.run(main())
