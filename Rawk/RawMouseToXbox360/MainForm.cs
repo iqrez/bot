@@ -1,6 +1,3 @@
-using Nefarius.ViGEm.Client;
-using Nefarius.ViGEm.Client.Targets;
-using Nefarius.ViGEm.Client.Targets.Xbox360;
 using System;
 using System.Windows.Forms;
 
@@ -8,105 +5,90 @@ namespace RawMouseToXbox360
 {
     public partial class MainForm : Form
     {
-        private ViGEmClient client;
-        private IXbox360Controller controller;
-
-        private bool leftTriggerPressed = false;
-        private bool rightTriggerPressed = false;
-        private bool leftBumperPressed = false;
-        private bool rightBumperPressed = false;
+        private ControllerManager controllerManager;
+        private WootingHandler wootingHandler;
+        private bool mnkToControllerEnabled = false;
 
         public MainForm()
         {
+            InitializeComponent();
+
             this.Shown += (s, e) =>
             {
                 try
                 {
                     RawInputHandler.RegisterMouseAndKeyboard(this.Handle);
-                    Console.WriteLine("Raw input registration succeeded.");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Raw input registration failed: {ex.Message}");
-                    throw;
+                    MessageBox.Show($"Raw input registration failed: {ex.Message}");
+                    Close();
+                    return;
                 }
 
-                InitializeViGEm();
-            };
-        }
+                controllerManager = new ControllerManager();
+                wootingHandler = new WootingHandler();
 
-        private void InitializeViGEm()
-        {
-            client = new ViGEmClient();
-            controller = client.CreateXbox360Controller();
-            controller.Connect();
-            Console.WriteLine("ViGEm controller connected.");
-
-            RawInputHandler.OnMouseDelta += (dx, dy) =>
-            {
-                short stickX = (short)Math.Clamp(dx * 2000, -32768, 32767);
-                short stickY = (short)Math.Clamp(-dy * 2000, -32768, 32767);
-
-                controller.SetAxisValue(Xbox360Axis.RightThumbX, stickX);
-                controller.SetAxisValue(Xbox360Axis.RightThumbY, stickY);
-                controller.SubmitReport();
-
-                Console.WriteLine($"Mouse moved: X={stickX}, Y={stickY}");
-            };
-
-            RawInputHandler.OnMouseButton += (button, pressed) =>
-            {
-                switch (button)
+                RawInputHandler.OnMouseDelta += (dx, dy) =>
                 {
-                    case MouseButtons.Left:
-                        leftTriggerPressed = pressed;
-                        controller.SetSliderValue(Xbox360Slider.LeftTrigger, pressed ? (byte)255 : (byte)0);
-                        break;
+                    if (mnkToControllerEnabled)
+                    {
+                        controllerManager.SetRightStick(dx, dy);
+                    }
+                };
 
-                    case MouseButtons.Right:
-                        rightTriggerPressed = pressed;
-                        controller.SetSliderValue(Xbox360Slider.RightTrigger, pressed ? (byte)255 : (byte)0);
-                        break;
+                RawInputHandler.OnMouseButton += (button, pressed) =>
+                {
+                    if (!mnkToControllerEnabled) return;
 
-                    case MouseButtons.XButton1:
-                        leftBumperPressed = pressed;
-                        controller.SetButtonState(Xbox360Button.LeftShoulder, pressed);
-                        break;
+                    switch (button)
+                    {
+                        case MouseButtons.Left:
+                            controllerManager.SetTrigger(true, pressed);
+                            break;
+                        case MouseButtons.Right:
+                            controllerManager.SetTrigger(false, pressed);
+                            break;
+                        case MouseButtons.XButton1:
+                            controllerManager.SetShoulder(true, pressed);
+                            break;
+                        case MouseButtons.XButton2:
+                            controllerManager.SetShoulder(false, pressed);
+                            break;
+                    }
+                };
 
-                    case MouseButtons.XButton2:
-                        rightBumperPressed = pressed;
-                        controller.SetButtonState(Xbox360Button.RightShoulder, pressed);
-                        break;
-                }
-                controller.SubmitReport();
-                Console.WriteLine($"Button {button} {(pressed ? "pressed" : "released")}");
+                RawInputHandler.OnMouseWheel += delta =>
+                {
+                    if (!mnkToControllerEnabled) return;
+                    controllerManager.TapDpad(delta > 0);
+                };
+
+                wootingHandler.OnAnalogChanged += (lx, ly) =>
+                {
+                    if (mnkToControllerEnabled)
+                    {
+                        controllerManager.SetLeftStick(lx, ly);
+                    }
+                };
             };
 
-            RawInputHandler.OnMouseWheel += (delta) =>
+            this.KeyPreview = true;
+            this.KeyDown += (s, e) =>
             {
-                if (delta > 0)
+                if (e.KeyCode == Keys.F10)
                 {
-                    controller.SetButtonState(Xbox360Button.Up, true);
-                    controller.SubmitReport();
-                    controller.SetButtonState(Xbox360Button.Up, false);
-                    controller.SubmitReport();
-                    Console.WriteLine("Mouse wheel up - DPadUp triggered");
-                }
-                else if (delta < 0)
-                {
-                    controller.SetButtonState(Xbox360Button.Down, true);
-                    controller.SubmitReport();
-                    controller.SetButtonState(Xbox360Button.Down, false);
-                    controller.SubmitReport();
-                    Console.WriteLine("Mouse wheel down - DPadDown triggered");
+                    mnkToControllerEnabled = !mnkToControllerEnabled;
+                    MessageBox.Show("Mouse & Keyboard to Controller is now " +
+                        (mnkToControllerEnabled ? "ENABLED" : "DISABLED"));
                 }
             };
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            controller?.Disconnect();
-            client?.Dispose();
+            controllerManager?.Dispose();
+            wootingHandler?.Dispose();
             base.OnFormClosing(e);
         }
 

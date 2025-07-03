@@ -8,5 +8,6 @@
   <ItemGroup>
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.17.183" />
     <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="WootingAnalogSDK.NET" Version="0.5.0" />
   </ItemGroup>
 </Project>
