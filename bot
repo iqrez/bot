@@ -195,7 +195,7 @@ async def install_missing_packages():
                             sys.exit(1)
                     await asyncio.sleep(2 ** attempt)
 
-def install_ffmpeg() -> str:
+def install_ffmpeg(abort_on_fail: bool = False) -> str:
     logger.info("Installing FFmpeg...")
     system = os.name
     ffmpeg_dir = Path("ffmpeg")
@@ -228,16 +228,20 @@ def install_ffmpeg() -> str:
                     subprocess.run(['sudo', 'apt', 'update'], check=True)
                     subprocess.run(['sudo', 'apt', 'install', '-y', 'ffmpeg'], check=True)
                     return 'ffmpeg'
-            except Exception:
-                pass
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                logger.error(f"apt installation failed: {e}")
+                if abort_on_fail:
+                    raise
             try:
                 result = subprocess.run(['which', 'yum'], capture_output=True)
                 if result.returncode == 0:
                     logger.info("Installing via yum...")
                     subprocess.run(['sudo', 'yum', 'install', '-y', 'ffmpeg'], check=True)
                     return 'ffmpeg'
-            except Exception:
-                pass
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                logger.error(f"yum installation failed: {e}")
+                if abort_on_fail:
+                    raise
             logger.info("Downloading static FFmpeg build...")
             url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
             tar_path = "ffmpeg_linux.tar.xz"
