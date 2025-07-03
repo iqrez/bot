@@ -1531,6 +1531,10 @@ class MusicBot(commands.Bot):
         embed.set_footer(text=f"Total songs in queue: {len(queue)}")
         await interaction.response.send_message(embed=embed)
 
+    async def play_command_impl(self, interaction: discord.Interaction, query: str):
+        """Wrapper for play command used by slash commands and UI."""
+        await self._play_command_impl(interaction, query)
+
     async def on_ready(self):
         """Called when bot is ready"""
         logger.info(f"{self.user} has connected to Discord, nya!")
