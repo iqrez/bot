@@ -1450,11 +1450,6 @@ class MusicBot(commands.Bot):
             
             logger.error(f"Play command crashed: {e}, nya!")
 
-
-    async def play_command_impl(self, interaction: discord.Interaction, query: str):
-        """Wrapper for play command used by slash commands and UI."""
-        await self._play_command_impl(interaction, query)
-
     async def on_ready(self):
         """Called when bot is ready"""
         logger.info(f"{self.user} has connected to Discord, nya!")
