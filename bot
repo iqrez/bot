@@ -400,11 +400,42 @@ class CachedSong(Base):
 # =============================================================================
 
 class PinManager:
-    MASTER_PIN = "1234"  # Hardcoded master PIN
+    """Utility class for verifying an administrator PIN."""
+
+    # Load the master PIN from the environment or optional config file at
+    # import time. If none is provided, the value will remain ``None``.
+    MASTER_PIN: Optional[str] = None
 
     @staticmethod
-    def verify_pin(pin: str) -> bool:
-        return pin == PinManager.MASTER_PIN
+    def load_master_pin() -> Optional[str]:
+        """Load the master PIN from ``MASTER_PIN`` env var or ``config.json``."""
+        pin = os.getenv("MASTER_PIN")
+        if pin:
+            return pin
+
+        config_file = Path("config.json")
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                pin = config_data.get("master_pin")
+            except Exception as e:  # pragma: no cover - best effort logging
+                logger.warning(f"Failed to load master PIN from config.json: {e}")
+        return pin
+
+    @classmethod
+    def get_master_pin(cls) -> Optional[str]:
+        if cls.MASTER_PIN is None:
+            cls.MASTER_PIN = cls.load_master_pin()
+        return cls.MASTER_PIN
+
+    @classmethod
+    def verify_pin(cls, pin: str) -> bool:
+        master_pin = cls.get_master_pin()
+        if master_pin is None:
+            logger.warning("Master PIN is not configured.")
+            return False
+        return pin == master_pin
 
 # =============================================================================
 # LOCAL SONGS MANAGER
