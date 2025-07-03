@@ -9,3 +9,11 @@ The bot reads required credentials from environment variables:
 
 Set these variables before running the bot.
 
+## Usage
+
+Run the bot with Python:
+
+```bash
+python bot.py
+```
+
