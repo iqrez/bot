@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import urlparse, parse_qs
 from discord.ext import commands
 from discord import app_commands
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, BigInteger, Float
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, BigInteger, Float, inspect
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.dialects.postgresql import JSON
 
@@ -657,10 +657,22 @@ class DatabaseManager:
         logger.info("Database manager initialized successfully")
 
     def create_tables(self):
+        """Create database tables if they do not already exist.
+
+        Existing tables are left untouched to avoid accidental data loss.
+        Schema migrations should be performed separately using a migration tool.
+        """
         try:
-            Base.metadata.drop_all(bind=self.engine)
-            Base.metadata.create_all(bind=self.engine)
-            logger.info("Database tables dropped and recreated successfully")
+            inspector = inspect(self.engine)
+            existing_tables = inspector.get_table_names()
+            missing_tables = [
+                t for t in Base.metadata.tables.keys() if t not in existing_tables
+            ]
+            if missing_tables:
+                Base.metadata.create_all(bind=self.engine)
+                logger.info("Database tables created successfully")
+            else:
+                logger.info("Database tables already exist; skipping creation")
         except Exception as e:
             logger.error(f"Failed to create database tables: {e}")
             raise
