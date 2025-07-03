@@ -294,11 +294,19 @@ def ensure_ffmpeg() -> str:
         sys.exit(1)
 
 def get_config() -> BotConfig:
-    discord_token = "MTM4NzM4NzYwOTA0NjcxMjQyMA.GHt4TX.5QE-KnKMpES2WK5X5UkOLj5u6x_PIaARCCaKS4"
-    logger.info("Using working Discord bot token")
-    
-    youtube_api_key = "AIzaSyCpgM0W1DunsnEas0Fn_2h77r6nhS8rS7w"
-    
+    """Load configuration from environment variables."""
+    discord_token = os.getenv("DISCORD_TOKEN")
+    if discord_token:
+        logger.info("Discord token loaded from environment")
+    else:
+        logger.warning("DISCORD_TOKEN environment variable not set")
+
+    youtube_api_key = os.getenv("YOUTUBE_API_KEY")
+    if youtube_api_key:
+        logger.info("YouTube API key loaded from environment")
+    else:
+        logger.warning("YOUTUBE_API_KEY environment variable not set")
+
     menu_channel_id = None
     return BotConfig(
         discord_token=discord_token,
