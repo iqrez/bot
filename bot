@@ -1297,12 +1297,12 @@ class MusicBot(commands.Bot):
     async def setup_hook(self):
         """Setup hook called when bot is starting"""
         logger.info("Setting up bot...")
+
+        await super().setup_hook()
         
         if not init_database():
             logger.error("Failed to initialize database")
             sys.exit(1)
-        
-        await self._register_commands()
         
         try:
             synced = await self.tree.sync()
@@ -1312,82 +1312,9 @@ class MusicBot(commands.Bot):
         except Exception as e:
             logger.error(f"Command sync failed: {e}")
 
-    async def _register_commands(self):
-        """Manually register commands to ensure they're added to the tree"""
-        logger.info("Registering commands manually...")
-        
-        @app_commands.command(name="ping", description="Test bot responsiveness")
-        async def ping_cmd(interaction: discord.Interaction):
-            embed = create_success_embed("Pong!", "Bot is ready to race, nya!")
-            await interaction.response.send_message(embed=embed)
-        
-        @app_commands.command(name="menu", description="Show music control panel")
-        async def menu_cmd(interaction: discord.Interaction):
-            await self._menu_command_impl(interaction)
-        
-        @app_commands.command(name="play", description="Play a song")
-        async def play_cmd(interaction: discord.Interaction, query: str):
-            await self._play_command_impl(interaction, query)
-        
-        @app_commands.command(name="stop", description="Stop music and clear queue")
-        async def stop_cmd(interaction: discord.Interaction):
-            await self._stop_command_impl(interaction)
-        
-        @app_commands.command(name="queue", description="Show current queue")
-        async def queue_cmd(interaction: discord.Interaction):
-            await self._queue_command_impl(interaction)
-        
-        self.tree.add_command(ping_cmd)
-        self.tree.add_command(menu_cmd)
-        self.tree.add_command(play_cmd)
-        self.tree.add_command(stop_cmd)
-        self.tree.add_command(queue_cmd)
-        
-        logger.info(f"Added {len(self.tree.get_commands())} commands to tree")
 
-    async def _menu_command_impl(self, interaction: discord.Interaction):
-        """Menu command implementation"""
-        try:
-            guild_id = interaction.guild.id
-            voice_client = self.bot_voice_clients.get(guild_id)
-            current_song = self.current_songs.get(guild_id)
-            queue = self.queues.get(guild_id, [])
-            
-            if current_song:
-                embed = create_embed(
-                    "🎵 Music Control Panel",
-                    f"**Now Playing:** {current_song.title}\n"
-                    f"**Requested by:** {current_song.requested_by}\n"
-                    f"**Queue:** {len(queue)} song(s)\n\n"
-                    f"Use the buttons below to control playback, nya!"
-                )
-                if current_song.thumbnail:
-                    embed.set_thumbnail(url=current_song.thumbnail)
-            else:
-                embed = create_embed(
-                    "🎵 Music Control Panel",
-                    "No music currently playing, nya!\n\n"
-                    "Use `/play <song>` to start the show!\n"
-                    "Use the buttons below for other controls."
-                )
-            
-            if queue:
-                queue_text = ""
-                for i, song in enumerate(queue[:5], 1):
-                    queue_text += f"{i}. {song.title}\n"
-                if len(queue) > 5:
-                    queue_text += f"... and {len(queue) - 5} more"
-                embed.add_field(name="🎶 Up Next", value=queue_text, inline=False)
-            
-            view = MusicControlView(self)
-            await interaction.response.send_message(embed=embed, view=view)
-            
-        except Exception as e:
-            logger.error(f"Menu command error: {e}")
-            embed = create_error_embed("Error", "Failed to display control panel, nya!")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    async def _play_command_impl(self, interaction: discord.Interaction, query: str):
+    async def play_command_impl(self, interaction: discord.Interaction, query: str):
         """Play command implementation—tuned like a B-Series VTEC, nya!"""
         start_time = time.perf_counter()  # Precision timing for the quarter-mile!
         
@@ -1484,56 +1411,6 @@ class MusicBot(commands.Bot):
             
             logger.error(f"Play command crashed: {e}, nya!")
 
-    async def _stop_command_impl(self, interaction: discord.Interaction):
-        """Stop command implementation"""
-        guild_id = interaction.guild.id
-        voice_client = self.bot_voice_clients.get(guild_id)
-        
-        if voice_client:
-            if voice_client.is_playing() or voice_client.is_paused():
-                voice_client.stop()
-            await voice_client.disconnect()
-            if guild_id in self.bot_voice_clients:
-                del self.bot_voice_clients[guild_id]
-        
-        if guild_id in self.queues:
-            self.queues[guild_id] = []
-        
-        if guild_id in self.current_songs:
-            del self.current_songs[guild_id]
-        
-        embed = create_success_embed("Stopped", "Stopped playing and cleared the queue, nya!")
-        await interaction.response.send_message(embed=embed)
-
-    async def _queue_command_impl(self, interaction: discord.Interaction):
-        """Queue command implementation"""
-        guild_id = interaction.guild.id
-        current_song = self.current_songs.get(guild_id)
-        queue = self.queues.get(guild_id, [])
-
-        embed = discord.Embed(title="🎵 Music Queue", color=discord.Color.blue())
-
-        if current_song:
-            embed.add_field(
-                name="🎶 Now Playing",
-                value=f"**{current_song.title}**\nRequested by: {current_song.requested_by}",
-                inline=False
-            )
-
-        if queue:
-            queue_text = ""
-            for i, song in enumerate(queue[:10], 1):
-                queue_text += f"{i}. **{song.title}**\n   Requested by: {song.requested_by}\n"
-            
-            if len(queue) > 10:
-                queue_text += f"\n... and {len(queue) - 10} more songs"
-            
-            embed.add_field(name="🔜 Up Next", value=queue_text, inline=False)
-        else:
-            embed.add_field(name="🔜 Queue", value="The queue is empty, nya!", inline=False)
-
-        embed.set_footer(text=f"Total songs in queue: {len(queue)}")
-        await interaction.response.send_message(embed=embed)
 
     async def on_ready(self):
         """Called when bot is ready"""
