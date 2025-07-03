@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 import asyncio
 import logging
 import sys
+import logging.handlers
 import os
 import subprocess
 import shutil
@@ -135,13 +137,13 @@ class BotConfig:
 def setup_logging():
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_dir / "bot.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+    )
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(log_dir / "bot.log", encoding='utf-8'),
-            logging.StreamHandler(sys.stdout)
-        ]
+        handlers=[file_handler, logging.StreamHandler(sys.stdout)]
     )
     logging.getLogger('discord').setLevel(logging.WARNING)
     logging.getLogger('discord.http').setLevel(logging.WARNING)
