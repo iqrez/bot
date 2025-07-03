@@ -132,6 +132,18 @@ class BotConfig:
     auto_disconnect_delay: int = 300
     search_results_limit: int = 5
 
+def load_config_file() -> Dict[str, Any]:
+    """Load optional configuration from ``config.json``."""
+    config_path = Path("config.json")
+    if not config_path.exists():
+        return {}
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:  # pragma: no cover - best effort logging
+        logger.warning(f"Failed to read {config_path}: {e}")
+        return {}
+
 def setup_logging():
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
@@ -298,20 +310,23 @@ def ensure_ffmpeg() -> str:
         sys.exit(1)
 
 def get_config() -> BotConfig:
-    """Load configuration from environment variables."""
-    discord_token = os.getenv("DISCORD_TOKEN")
+    """Load configuration from environment variables or ``config.json``."""
+    config_data = load_config_file()
+
+    discord_token = os.getenv("DISCORD_TOKEN") or config_data.get("discord_token")
     if discord_token:
-        logger.info("Discord token loaded from environment")
+        logger.info("Discord token loaded from environment or config file")
     else:
-        logger.warning("DISCORD_TOKEN environment variable not set")
+        logger.warning("Discord token not provided")
 
-    youtube_api_key = os.getenv("YOUTUBE_API_KEY")
+    youtube_api_key = os.getenv("YOUTUBE_API_KEY") or config_data.get("youtube_api_key")
     if youtube_api_key:
-        logger.info("YouTube API key loaded from environment")
+        logger.info("YouTube API key loaded from environment or config file")
     else:
-        logger.warning("YOUTUBE_API_KEY environment variable not set")
+        logger.warning("YouTube API key not provided")
 
-    menu_channel_id = None
+    menu_channel_id = config_data.get("menu_channel_id")
+
     return BotConfig(
         discord_token=discord_token,
         youtube_api_key=youtube_api_key,
