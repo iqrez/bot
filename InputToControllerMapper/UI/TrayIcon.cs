@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Core;
 
 namespace InputToControllerMapper
 {
@@ -38,10 +39,10 @@ namespace InputToControllerMapper
             menu.Items.Add(enable);
 
             var profiles = new ToolStripMenuItem("Profiles");
-            foreach (var p in manager.All)
+            foreach (var p in manager.Profiles)
             {
-                var item = new ToolStripMenuItem(p.Name) { Checked = p.Name == manager.ActiveProfile.Name };
-                item.Click += (s, e) => { manager.SetActiveProfile(p.Name); BuildMenu(); };
+                var item = new ToolStripMenuItem(p.Name) { Checked = p.Name == manager.CurrentProfile.Name };
+                item.Click += (s, e) => { manager.SetCurrentProfile(p.Name); BuildMenu(); };
                 profiles.DropDownItems.Add(item);
             }
             menu.Items.Add(profiles);

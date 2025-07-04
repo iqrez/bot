@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using InputToControllerMapper;
+using Core;
 
 namespace InputToControllerMapper.UI
 {
@@ -47,8 +48,11 @@ namespace InputToControllerMapper.UI
 
             tray = new TrayIcon(this, profileManager);
 
+            // Proper tray disposal on exit and close
             Application.ApplicationExit += (s, e) => tray.Dispose();
             FormClosed += (s, e) => tray.Dispose();
+
+            // Refresh UI when profile changes
             profileManager.ProfileChanged += (s, e) =>
             {
                 if (InvokeRequired)
@@ -72,9 +76,11 @@ namespace InputToControllerMapper.UI
         private void RefreshProfileList()
         {
             profileList.Items.Clear();
-            foreach (var p in profileManager.All)
+            foreach (var p in profileManager.Profiles)
                 profileList.Items.Add(p.Name);
-            profileList.SelectedItem = profileManager.ActiveProfile.Name;
+            // Pick active/selected profile robustly:
+            if (profileManager.ActiveProfile != null)
+                profileList.SelectedItem = profileManager.ActiveProfile.Name;
             LoadActiveProfile();
         }
 

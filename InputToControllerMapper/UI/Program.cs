@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Forms;
 using System.IO;
+using Core;
 
 namespace InputToControllerMapper
 {
@@ -15,9 +16,11 @@ namespace InputToControllerMapper
 
             string appPath = Application.UserAppDataPath;
             Directory.CreateDirectory(appPath);
-            var profileManager = new ProfileManager(Path.Combine(appPath, "profiles"));
 
-            using MainWindow mainForm = new MainWindow(profileManager);
+            var settingsManager = new SettingsManager(Path.Combine(appPath, "settings.json"));
+            var profileManager = new Core.ProfileManager(appPath);
+
+            MainForm mainForm = new MainForm(settingsManager, profileManager);
             Application.Run(mainForm);
         }
     }

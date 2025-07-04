@@ -1,12 +1,14 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Core;
 
 namespace InputToControllerMapper
 {
     public class MainForm : Form
     {
         private readonly SettingsManager settingsManager;
+        private readonly ProfileManager profileManager;
 
         private ListBox profileList;
         private DataGridView mappingGrid;
@@ -15,9 +17,10 @@ namespace InputToControllerMapper
         private TrayIcon tray;
         private Button settingsButton;
 
-        public MainForm(SettingsManager settings)
+        public MainForm(SettingsManager settings, ProfileManager profiles)
         {
             settingsManager = settings;
+            profileManager = profiles;
 
             Text = "Input To Controller Mapper";
             Size = new Size(800, 600);
@@ -46,7 +49,11 @@ namespace InputToControllerMapper
             Controls.Add(settingsButton);
 
             FormClosing += OnFormClosing;
-            tray = new TrayIcon(this);
+
+            // Always instantiate tray with profileManager for new branch compatibility
+            tray = new TrayIcon(this, profileManager);
+
+            // Properly dispose tray on exit or close
             Application.ApplicationExit += (s, e) => tray.Dispose();
             FormClosed += (s, e) => tray.Dispose();
 
