@@ -8,13 +8,13 @@ using System.Windows.Forms;
 
 namespace InputToControllerMapper
 {
-    public class MappingEngine : IDisposable
+    public class ControllerMappingEngine : IDisposable
     {
         private readonly ViGEmClient client;
         private readonly IXbox360Controller controller;
         private Profile profile = new Profile();
 
-        public MappingEngine()
+        public ControllerMappingEngine()
         {
             client = new ViGEmClient();
             controller = client.CreateXbox360Controller();

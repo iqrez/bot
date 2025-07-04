@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InputToControllerMapper", "
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeadlessControllerEmulator", "HeadlessControllerEmulator\HeadlessControllerEmulator.csproj", "{D3A991B4-AC54-47C3-A376-790BE5E0D5F3}"
 EndProject
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeadlessControllerEmulator", "HeadlessControllerEmulator\HeadlessControllerEmulator.csproj", "{D3A991B4-AC54-47C3-A376-790BE5E0D5F3}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{99DA5C86-234A-427A-8066-6484A743EB69}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InputMapper.Tests", "Tests\InputMapper.Tests\InputMapper.Tests.csproj", "{9ACB542D-17E8-436E-92CF-CEC246151C09}"
