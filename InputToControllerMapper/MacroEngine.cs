@@ -84,12 +84,27 @@ namespace InputToControllerMapper
         internal CancellationTokenSource? Source;
     }
 
+    public class MacroErrorEventArgs : EventArgs
+    {
+        public string MacroName { get; }
+        public Exception Exception { get; }
+        public MacroErrorEventArgs(string macroName, Exception ex)
+        {
+            MacroName = macroName;
+            Exception = ex;
+        }
+    }
+
     public class MacroEngine
     {
         private readonly IButtonSink sink;
         private readonly object sync = new();
         private readonly Dictionary<string, Macro> macros = new();
         private readonly Dictionary<string, MacroTrigger> triggers = new();
+
+        public event EventHandler<string>? MacroStarted;
+        public event EventHandler<string>? MacroCompleted;
+        public event EventHandler<MacroErrorEventArgs>? MacroError;
 
         public MacroEngine(IButtonSink sink)
         {
@@ -104,12 +119,17 @@ namespace InputToControllerMapper
             }
         }
 
-        public void RemoveMacro(string name)
+        public bool RemoveMacro(string name)
         {
             lock (sync)
             {
-                macros.Remove(name);
+                return macros.Remove(name);
             }
+        }
+
+        public Task TriggerMacro(string name, int repeatOverride = 0, CancellationToken token = default)
+        {
+            return RunMacroAsync(name, token, repeatOverride);
         }
 
         public void BindTrigger(string key, MacroTrigger trigger)
@@ -187,14 +207,25 @@ namespace InputToControllerMapper
             if (macro == null)
                 return;
 
-            int count = repeatOverride == 0 ? macro.Repeat : repeatOverride;
-            for (int i = 0; count < 0 || i < count; i++)
+            MacroStarted?.Invoke(this, name);
+            
+            try
             {
-                foreach (var action in macro.Actions)
+                int count = repeatOverride == 0 ? macro.Repeat : repeatOverride;
+                for (int i = 0; count < 0 || i < count; i++)
                 {
-                    token.ThrowIfCancellationRequested();
-                    await action.ExecuteAsync(sink, token).ConfigureAwait(false);
+                    foreach (var action in macro.Actions)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        await action.ExecuteAsync(sink, token).ConfigureAwait(false);
+                    }
                 }
+
+                MacroCompleted?.Invoke(this, name);
+            }
+            catch (Exception ex)
+            {
+                MacroError?.Invoke(this, new MacroErrorEventArgs(name, ex));
             }
         }
 
