@@ -73,7 +73,7 @@ namespace InputToControllerMapper
             return false;
         }
 
-        public Profile GetProfile(string name)
+        public Profile? GetProfile(string name)
         {
             profiles.TryGetValue(name, out var p);
             return p;
