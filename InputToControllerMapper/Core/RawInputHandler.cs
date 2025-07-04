@@ -140,31 +140,38 @@ namespace InputToControllerMapper
         /// </summary>
         public void ProcessInputMessage(IntPtr lParam)
         {
-            uint dwSize = 0;
-            uint headerSize = (uint)Marshal.SizeOf<RAWINPUTHEADER>();
-
-            if (GetRawInputData(lParam, RID_INPUT, IntPtr.Zero, ref dwSize, headerSize) != 0 || dwSize == 0)
-                return;
-
-            IntPtr buffer = Marshal.AllocHGlobal((int)dwSize);
             try
             {
-                if (GetRawInputData(lParam, RID_INPUT, buffer, ref dwSize, headerSize) != dwSize)
+                uint dwSize = 0;
+                uint headerSize = (uint)Marshal.SizeOf<RAWINPUTHEADER>();
+
+                if (GetRawInputData(lParam, RID_INPUT, IntPtr.Zero, ref dwSize, headerSize) != 0 || dwSize == 0)
                     return;
 
-                RAWINPUT raw = Marshal.PtrToStructure<RAWINPUT>(buffer);
-                if (raw.header.dwType == RIM_TYPEKEYBOARD)
+                IntPtr buffer = Marshal.AllocHGlobal((int)dwSize);
+                try
                 {
-                    HandleKeyboard(raw.keyboard);
+                    if (GetRawInputData(lParam, RID_INPUT, buffer, ref dwSize, headerSize) != dwSize)
+                        return;
+
+                    RAWINPUT raw = Marshal.PtrToStructure<RAWINPUT>(buffer);
+                    if (raw.header.dwType == RIM_TYPEKEYBOARD)
+                    {
+                        HandleKeyboard(raw.keyboard);
+                    }
+                    else if (raw.header.dwType == RIM_TYPEMOUSE)
+                    {
+                        HandleMouse(raw.mouse);
+                    }
                 }
-                else if (raw.header.dwType == RIM_TYPEMOUSE)
+                finally
                 {
-                    HandleMouse(raw.mouse);
+                    Marshal.FreeHGlobal(buffer);
                 }
             }
-            finally
+            catch (Exception ex)
             {
-                Marshal.FreeHGlobal(buffer);
+                Logger.LogError("Error processing raw input", ex);
             }
         }
 

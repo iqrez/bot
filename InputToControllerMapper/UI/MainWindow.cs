@@ -53,10 +53,17 @@ namespace InputToControllerMapper.UI
 
         private void OnFormClosing(object? sender, FormClosingEventArgs e)
         {
-            if (e.CloseReason == CloseReason.UserClosing)
+            try
             {
-                e.Cancel = true;
-                Hide();
+                if (e.CloseReason == CloseReason.UserClosing)
+                {
+                    e.Cancel = true;
+                    Hide();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error during window closing", ex);
             }
         }
 
@@ -90,17 +97,38 @@ namespace InputToControllerMapper.UI
 
         private void OnKey(object? sender, RawKeyEventArgs e)
         {
-            inputStateBox.Text = $"Key {e.VirtualKey} {(e.IsKeyDown ? "Down" : "Up")}";
+            try
+            {
+                inputStateBox.Text = $"Key {e.VirtualKey} {(e.IsKeyDown ? "Down" : "Up")}";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in key handler", ex);
+            }
         }
 
         private void OnMouseButton(object? sender, RawMouseButtonEventArgs e)
         {
-            inputStateBox.Text = $"Button {e.Button} {(e.IsButtonDown ? "Down" : "Up")}";
+            try
+            {
+                inputStateBox.Text = $"Button {e.Button} {(e.IsButtonDown ? "Down" : "Up")}";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in mouse button handler", ex);
+            }
         }
 
         private void OnMouseMove(object? sender, RawMouseMoveEventArgs e)
         {
-            inputStateBox.Text = $"Move {e.DeltaX},{e.DeltaY}";
+            try
+            {
+                inputStateBox.Text = $"Move {e.DeltaX},{e.DeltaY}";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in mouse move handler", ex);
+            }
         }
 
         private void ShowCurveEditor()

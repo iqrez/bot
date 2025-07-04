@@ -56,11 +56,18 @@ namespace InputToControllerMapper
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
-            if (e.CloseReason == CloseReason.UserClosing)
+            try
             {
-                e.Cancel = true;
-                Hide();
-                tray.ShowHideNotification();
+                if (e.CloseReason == CloseReason.UserClosing)
+                {
+                    e.Cancel = true;
+                    Hide();
+                    tray.ShowHideNotification();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error during form closing", ex);
             }
         }
 

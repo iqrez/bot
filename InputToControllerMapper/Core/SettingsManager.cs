@@ -46,12 +46,15 @@ namespace InputToControllerMapper
                 settings = new Settings();
                 Save();
             }
+
+            Logger.Enabled = settings.EnableDiagnostics;
         }
 
         public void Save()
         {
             string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(filePath, json);
+            Logger.Enabled = settings.EnableDiagnostics;
             SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
 
