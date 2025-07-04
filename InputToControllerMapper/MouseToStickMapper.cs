@@ -2,6 +2,9 @@ using System;
 
 namespace InputToControllerMapper
 {
+    /// <summary>
+    /// Shapes available when converting mouse magnitude to stick output.
+    /// </summary>
     public enum StickCurveShape
     {
         Linear,
@@ -14,29 +17,29 @@ namespace InputToControllerMapper
     /// </summary>
     public class MouseToStickMapper
     {
-        public float SensitivityX { get; set; } = 1f;
-        public float SensitivityY { get; set; } = 1f;
-        public float Deadzone { get; set; } = 0f;
-        public float Acceleration { get; set; } = 0f;
-        public float Smoothing { get; set; } = 0f;
-        public bool InvertY { get; set; }
-        public StickCurveShape Curve { get; set; } = StickCurveShape.Linear;
-        public float Exponent { get; set; } = 1.5f;          // used for Exponential and DualZone curves
-        public float OuterExponent { get; set; } = 1.0f;      // used for DualZone curves
-        public float DualZoneThreshold { get; set; } = 0.5f;  // 0..1
-
+        private MouseToStickConfig config = new MouseToStickConfig();
         private float smoothX;
         private float smoothY;
+
+        /// <summary>
+        /// Replace the current configuration.
+        /// </summary>
+        public void SetConfig(MouseToStickConfig cfg)
+        {
+            config = cfg;
+            smoothX = 0f;
+            smoothY = 0f;
+        }
 
         /// <summary>
         /// Process mouse delta and return stick axis values in range -32767..32767.
         /// </summary>
         public (short X, short Y) Map(int deltaX, int deltaY)
         {
-            float x = ProcessAxis(deltaX, SensitivityX, ref smoothX);
-            float y = ProcessAxis(deltaY, SensitivityY, ref smoothY);
+            float x = ProcessAxis(deltaX, config.SensitivityX, ref smoothX);
+            float y = ProcessAxis(deltaY, config.SensitivityY, ref smoothY);
 
-            if (InvertY)
+            if (config.InvertY)
                 y = -y;
 
             short sx = (short)Math.Clamp(x * 32767f, -32767f, 32767f);
@@ -48,22 +51,19 @@ namespace InputToControllerMapper
         {
             float value = delta * sensitivity;
 
-            if (Acceleration > 0f)
-                value *= 1f + MathF.Abs(value) * Acceleration;
-
-            if (Smoothing > 0f)
+            if (config.Smoothing > 0f)
             {
-                smooth += (value - smooth) * Smoothing;
+                smooth += (value - smooth) * config.Smoothing;
                 value = smooth;
             }
 
             float sign = MathF.Sign(value);
             float magnitude = MathF.Abs(value);
 
-            if (magnitude < Deadzone)
+            if (magnitude < config.Deadzone)
                 return 0f;
 
-            magnitude = (magnitude - Deadzone) / (1f - Deadzone);
+            magnitude = (magnitude - config.Deadzone) / (1f - config.Deadzone);
             magnitude = ApplyCurve(magnitude);
 
             return sign * magnitude;
@@ -73,22 +73,22 @@ namespace InputToControllerMapper
         {
             value = MathF.Min(MathF.Max(value, 0f), 1f);
 
-            switch (Curve)
+            switch (config.Curve)
             {
                 case StickCurveShape.Linear:
                     return value;
                 case StickCurveShape.Exponential:
-                    return MathF.Pow(value, Exponent);
+                    return MathF.Pow(value, config.Exponent);
                 case StickCurveShape.DualZone:
-                    if (value < DualZoneThreshold)
+                    if (value < config.DualZoneThreshold)
                     {
-                        float inner = value / DualZoneThreshold;
-                        return MathF.Pow(inner, Exponent) * DualZoneThreshold;
+                        float inner = value / config.DualZoneThreshold;
+                        return MathF.Pow(inner, config.Exponent) * config.DualZoneThreshold;
                     }
                     else
                     {
-                        float outer = (value - DualZoneThreshold) / (1f - DualZoneThreshold);
-                        return MathF.Pow(outer, OuterExponent) * (1f - DualZoneThreshold) + DualZoneThreshold;
+                        float outer = (value - config.DualZoneThreshold) / (1f - config.DualZoneThreshold);
+                        return MathF.Pow(outer, config.OuterExponent) * (1f - config.DualZoneThreshold) + config.DualZoneThreshold;
                     }
                 default:
                     return value;
