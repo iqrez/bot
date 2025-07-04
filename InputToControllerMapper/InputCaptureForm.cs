@@ -12,7 +12,6 @@ namespace InputToControllerMapper
         private WootingAnalogHandler wootingHandler;
         private ViGEmClient client;
         private IXbox360Controller controller;
-        private TextBox logBox;
         private Panel wootingPanel;
         private Panel vigemPanel;
         private Panel rawPanel;
@@ -26,15 +25,6 @@ namespace InputToControllerMapper
             Controls.Add(vigemPanel);
             Controls.Add(rawPanel);
 
-            logBox = new TextBox
-            {
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Size = new Size(360, 240),
-                Location = new Point(10, 40)
-            };
-            Controls.Add(logBox);
 
             try
             {
@@ -88,7 +78,6 @@ namespace InputToControllerMapper
 
         private void Log(string msg, Logger.LogLevel level = Logger.LogLevel.Info)
         {
-            logBox.AppendText(msg + Environment.NewLine);
             switch (level)
             {
                 case Logger.LogLevel.Warning:
