@@ -52,6 +52,7 @@ namespace InputToControllerMapper
             Label themeLabel = new Label { Text = "Theme:", Dock = DockStyle.Top };
             themeLabel.AccessibleName = "Theme Label";
             themeLabel.AccessibleDescription = "Label for theme selection";
+            themeLabel.TabStop = false;
             Controls.Add(themeLabel);
 
             inputGroup = new GroupBox { Text = "Input State", Dock = DockStyle.Bottom, Height = 80 };

@@ -5,6 +5,7 @@ This Windows application maps various input devices to a virtual Xbox 360 contro
 ### Keyboard navigation
 * All controls have explicit tab order so the entire interface can be used without a mouse.
 * Status indicators include descriptive accessibility text for screen readers.
+* Theme selection label is skipped in tab order for smoother navigation.
 
 ### Theme support
 * Use the **Theme Selection** drop-down at the top of the main window to switch between light and dark themes.
