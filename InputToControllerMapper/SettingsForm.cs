@@ -4,6 +4,8 @@ using System.Windows.Forms;
 
 namespace InputToControllerMapper
 {
+    // UI dialog for modifying persistent user preferences.
+    // Merged after resolving conflicts with main (@iqrez)
     public class SettingsForm : Form
     {
         private readonly SettingsManager settingsManager;
