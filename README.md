@@ -28,6 +28,14 @@ Launch the application from the `InputToControllerMapper` project:
 dotnet run --project InputToControllerMapper
 ```
 
+### Headless controller emulator
+
+For a minimal, non-UI version run:
+
+```bash
+dotnet run --project HeadlessControllerEmulator
+```
+
 ## Tests
 
 Unit tests live under the `Tests` folder and can be run with:
