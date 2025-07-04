@@ -10,6 +10,13 @@ namespace InputToControllerMapper
     {
         public string ActiveProfile { get; set; } = "Default";
         public Dictionary<string, string> ProcessProfiles { get; set; } = new Dictionary<string, string>();
+
+        // Advanced/general app options
+        public bool StartWithWindows { get; set; } = false;
+        public string DefaultProfile { get; set; } = "Default";
+        public string Theme { get; set; } = "Light";
+        public bool EnableDiagnostics { get; set; } = false;
+        public bool CheckForUpdates { get; set; } = true;
     }
 
     public class SettingsManager
