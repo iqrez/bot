@@ -14,13 +14,19 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            // App data location
             string appPath = Application.UserAppDataPath;
             Directory.CreateDirectory(appPath);
 
-            var settingsManager = new SettingsManager(Path.Combine(appPath, "settings.json"));
-            var profileManager = new Core.ProfileManager(appPath);
+            // Profiles directory inside app data
+            string profilesDir = Path.Combine(appPath, "profiles");
+            Directory.CreateDirectory(profilesDir);
 
-            MainForm mainForm = new MainForm(settingsManager, profileManager);
+            // ProfileManager expects a folder, not a file
+            var profileManager = new ProfileManager(profilesDir);
+
+            // Use MainWindow as your main form
+            using var mainForm = new UI.MainWindow(profileManager);
             Application.Run(mainForm);
         }
     }
