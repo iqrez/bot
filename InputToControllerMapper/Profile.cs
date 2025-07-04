@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace InputToControllerMapper
 {
@@ -20,11 +21,12 @@ namespace InputToControllerMapper
 
     public class Profile
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
 
         public int Version { get; set; } = CurrentVersion;
         public string Name { get; set; } = "Default";
         public ControllerType ControllerType { get; set; } = ControllerType.Xbox360;
+        [JsonPropertyName("KeyBindings")]
         public Dictionary<string, string> Bindings { get; set; } = new();
         public Dictionary<string, AnalogConfig> Analog { get; set; } = new();
         public Dictionary<string, Macro> Macros { get; set; } = new();
