@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace InputToControllerMapper.Core
+namespace InputToControllerMapper
 {
     /// <summary>
     /// Helper utilities for loading and saving JSON configuration files.
