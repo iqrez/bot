@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Runtime.InteropServices;
 
-namespace InputToControllerMapper
+namespace Core
 {
     /// <summary>
     /// Provides access to Wooting keyboards via the official analog SDK.

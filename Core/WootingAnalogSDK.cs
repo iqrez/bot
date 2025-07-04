@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace InputToControllerMapper
+namespace Core
 {
     public enum KeyCodeMode { HID = 0, ScanCode1 = 1, VirtualKey = 2 }
 
