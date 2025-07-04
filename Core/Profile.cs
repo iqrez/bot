@@ -61,8 +61,27 @@ namespace Core
 
     public class Profile
     {
+        public const int CurrentVersion = 1;
+
+        public int Version { get; set; } = CurrentVersion;
         public string Name { get; set; } = "Default";
         public List<InputMapping> Mappings { get; set; } = new();
+
+        // --- Legacy support for simple key bindings ---
+        [JsonIgnore]
+        public Dictionary<string, string> KeyBindings
+        {
+            get
+            {
+                var dict = new Dictionary<string, string>();
+                foreach (var m in Mappings)
+                {
+                    if (m.Actions.Count == 1)
+                        dict[m.Code] = m.Actions[0].Target;
+                }
+                return dict;
+            }
+        }
 
         public static Profile Load(string path)
         {
@@ -80,6 +99,55 @@ namespace Core
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(this, options);
             File.WriteAllText(path, json);
+        }
+
+        public static Profile FromJson(string json)
+        {
+            using var doc = JsonDocument.Parse(json);
+            return FromJsonElement(doc.RootElement);
+        }
+
+        public static Profile FromJsonElement(JsonElement element)
+        {
+            var profile = new Profile
+            {
+                Version = element.TryGetProperty("Version", out var v) && v.ValueKind == JsonValueKind.Number
+                    ? v.GetInt32() : CurrentVersion,
+                Name = element.TryGetProperty("Name", out var n) ? n.GetString() ?? "Default" : "Default"
+            };
+
+            if (element.TryGetProperty("Mappings", out var mappings) && mappings.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var mapping in mappings.EnumerateArray())
+                {
+                    try
+                    {
+                        var im = JsonSerializer.Deserialize<InputMapping>(mapping.GetRawText());
+                        if (im != null)
+                            profile.Mappings.Add(im);
+                    }
+                    catch { /* skip corrupt mappings */ }
+                }
+            }
+            // Legacy: Try to read KeyBindings as well
+            else if (element.TryGetProperty("KeyBindings", out var bindings) && bindings.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in bindings.EnumerateObject())
+                {
+                    var im = new InputMapping
+                    {
+                        Type = InputType.Key,
+                        Code = prop.Name,
+                        Actions = new List<ControllerAction> {
+                            new ControllerAction { Element = ControllerElement.Button, Target = prop.Value.GetString() ?? "" }
+                        }
+                    };
+                    profile.Mappings.Add(im);
+                }
+            }
+
+            profile.Version = CurrentVersion;
+            return profile;
         }
     }
 }
