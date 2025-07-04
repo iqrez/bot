@@ -1,17 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../InputToControllerMapper/InputToControllerMapper.csproj" />
+    <Compile Include="../../InputToControllerMapper/Core/*.cs" />
+    <ProjectReference Include="../../Core/Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
+    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
   </ItemGroup>
+
+  <Target Name="BuildNativeStubs" BeforeTargets="Build">
+    <Exec Command="gcc -shared -fPIC &quot;$(MSBuildThisFileDirectory)..\woot_stub\woot_stub.c&quot; -o &quot;$(OutDir)wooting_analog_wrapper.dll&quot;" />
+  </Target>
 </Project>
