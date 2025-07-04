@@ -36,23 +36,23 @@ namespace InputToControllerMapper
             mappingGrid.TabIndex = 1;
             Controls.Add(mappingGrid);
 
-            themeBox = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
-            themeBox.Items.AddRange(Enum.GetNames(typeof(Theme)));
-            themeBox.AccessibleName = "Theme Selection";
-            themeBox.AccessibleDescription = "Choose between light and dark mode";
-            themeBox.SelectedItem = ThemeManager.CurrentTheme.ToString();
-            themeBox.SelectedIndexChanged += (s, e) =>
-            {
-                ThemeManager.CurrentTheme = Enum.Parse<Theme>(themeBox.SelectedItem.ToString());
-                ThemeManager.ApplyTheme(this);
-            };
-            themeBox.TabIndex = 2;
-            Controls.Add(themeBox);
-
             Label themeLabel = new Label { Text = "Theme:", Dock = DockStyle.Top };
             themeLabel.AccessibleName = "Theme Label";
             themeLabel.AccessibleDescription = "Label for theme selection";
             themeLabel.TabStop = false;
+
+            themeBox = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
+            themeBox.DataSource = Enum.GetValues(typeof(Theme));
+            themeBox.AccessibleName = "Theme Selection";
+            themeBox.AccessibleDescription = "Choose between light and dark mode";
+            themeBox.SelectedItem = ThemeManager.CurrentTheme;
+            themeBox.SelectedIndexChanged += (s, e) =>
+            {
+                ThemeManager.CurrentTheme = (Theme)themeBox.SelectedItem;
+                ThemeManager.ApplyTheme(this);
+            };
+            themeBox.TabIndex = 2;
+            Controls.Add(themeBox);
             Controls.Add(themeLabel);
 
             inputGroup = new GroupBox { Text = "Input State", Dock = DockStyle.Bottom, Height = 80 };
