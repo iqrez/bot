@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
+using Core;
 using System.Windows.Forms;
 
 namespace InputToControllerMapper
@@ -11,7 +12,7 @@ namespace InputToControllerMapper
     {
         private readonly ViGEmClient client;
         private readonly IXbox360Controller controller;
-        private MappingProfile profile = new MappingProfile();
+        private Profile profile = new Profile();
 
         public MappingEngine()
         {
@@ -20,14 +21,14 @@ namespace InputToControllerMapper
             controller.Connect();
         }
 
-        public void LoadProfile(MappingProfile p)
+        public void LoadProfile(Profile p)
         {
             profile = p;
         }
 
         public void LoadProfile(string path)
         {
-            profile = MappingProfile.Load(path);
+            profile = Profile.Load(path);
         }
 
         public void ProcessKeyEvent(Keys key, bool isDown)

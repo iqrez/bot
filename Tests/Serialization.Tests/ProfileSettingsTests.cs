@@ -2,6 +2,19 @@ using System.Collections.Generic;
 using System.Text.Json;
 using Core;
 
+public class ProfileSettings
+{
+    public string CurrentProfile { get; set; } = "Default";
+    public List<AppProfileRule> AppProfiles { get; set; } = new();
+}
+
+public class AppProfileRule
+{
+    public string? ProcessName { get; set; }
+    public string? WindowTitleContains { get; set; }
+    public string ProfileName { get; set; } = "";
+}
+
 public class ProfileSettingsTests
 {
     [Fact]

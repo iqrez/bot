@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
-using InputToControllerMapper;
+using Core;
 using Xunit;
 
 namespace InputMapper.Tests;
@@ -14,14 +13,24 @@ public class ProfileTests
         var profile = new Profile
         {
             Name = "Test",
-            KeyBindings = new Dictionary<string, string> { ["A"] = "B" }
+            Mappings = new List<InputMapping>
+            {
+                new()
+                {
+                    Type = InputType.Key,
+                    Code = "A",
+                    Actions = new List<ControllerAction>
+                    {
+                        new() { Element = ControllerElement.Button, Target = "B" }
+                    }
+                }
+            }
         };
-        profile.Version = Profile.CurrentVersion;
 
         string path = Path.Combine(Path.GetTempPath(), "prof.json");
-        File.WriteAllText(path, JsonSerializer.Serialize(profile));
-        var loaded = Profile.FromJson(File.ReadAllText(path));
+        profile.Save(path);
+        var loaded = Profile.Load(path);
         Assert.Equal("Test", loaded.Name);
-        Assert.Equal("B", loaded.KeyBindings["A"]);
+        Assert.Equal(profile.Mappings[0].Code, loaded.Mappings[0].Code);
     }
 }

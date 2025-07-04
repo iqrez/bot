@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using InputToControllerMapper;
+using Core;
 using Xunit;
 
 namespace InputMapper.Tests;
@@ -22,13 +23,13 @@ public class MappingEngineTests
     [Fact]
     public void ApplyActionsSetsControllerState()
     {
-        var engine = (MappingEngine)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(MappingEngine));
-        var controllerField = typeof(MappingEngine).GetField("controller", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var clientField = typeof(MappingEngine).GetField("client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var engine = (InputToControllerMapper.MappingEngine)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(InputToControllerMapper.MappingEngine));
+        var controllerField = typeof(InputToControllerMapper.MappingEngine).GetField("controller", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var clientField = typeof(InputToControllerMapper.MappingEngine).GetField("client", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var dummy = new DummyController();
         controllerField.SetValue(engine, dummy);
         clientField.SetValue(engine, null);
-        var profile = new MappingProfile();
+        var profile = new Core.Profile();
         profile.Mappings.Add(new InputMapping
         {
             Type = InputType.Key,
