@@ -7,13 +7,13 @@ namespace HeadlessControllerEmulator
 {
     internal class HiddenForm : Form
     {
-        private readonly ControllerMappingEngine engine;
+        private readonly MappingEngine engine;
         private readonly ProfileManager manager;
 
         public HiddenForm()
         {
             manager = new ProfileManager("HeadlessEmulator");
-            engine = new ControllerMappingEngine();
+            engine = new MappingEngine();
         }
 
         protected override void OnShown(EventArgs e)

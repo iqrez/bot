@@ -6,6 +6,8 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{10352160-6EF9-4DB2-9E20-24FD8E824AFE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InputToControllerMapper", "InputToControllerMapper\InputToControllerMapper.csproj", "{FD25733C-EA84-4040-82DC-144B850564F6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeadlessControllerEmulator", "HeadlessControllerEmulator\HeadlessControllerEmulator.csproj", "{D3A991B4-AC54-47C3-A376-790BE5E0D5F3}"
+EndProject
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeadlessControllerEmulator", "HeadlessControllerEmulator\HeadlessControllerEmulator.csproj", "{D3A991B4-AC54-47C3-A376-790BE5E0D5F3}"
 EndProject
