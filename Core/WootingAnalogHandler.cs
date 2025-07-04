@@ -42,8 +42,9 @@ namespace Core
         public event Action<int, DKSStage>? DKSStageChanged;
         public event Action<int, bool>? RapidTriggerFired;
 
-        private readonly Thread pollThread;
+        private Thread? pollThread;
         private volatile bool running;
+        private readonly bool available;
         private bool disposed;
 
         public WootingAnalogHandler()
@@ -52,17 +53,22 @@ namespace Core
             try
             {
                 res = Native.Initialise();
+                if (res != 0)
+                {
+                    available = false;
+                    return;
+                }
+                available = true;
             }
-            catch (DllNotFoundException ex)
+            catch (DllNotFoundException)
             {
-                throw new InvalidOperationException("Wooting analog SDK not found", ex);
+                available = false;
+                return;
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException("Failed to initialise Wooting SDK", ex);
             }
-            if (res != 0)
-                throw new InvalidOperationException($"Wooting initialisation failed ({res})");
 
             running = true;
             pollThread = new Thread(PollLoop) { IsBackground = true };
@@ -129,11 +135,14 @@ namespace Core
             disposed = true;
 
             running = false;
-            if (pollThread.IsAlive)
+            if (pollThread != null && pollThread.IsAlive)
             {
                 try { pollThread.Join(); } catch { }
             }
-            try { Native.Uninitialise(); } catch { }
+            if (available)
+            {
+                try { Native.Uninitialise(); } catch { }
+            }
         }
     }
 

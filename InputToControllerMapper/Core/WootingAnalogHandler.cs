@@ -36,8 +36,9 @@ namespace InputToControllerMapper
         private readonly float[] values = new float[KeyCount];
         private readonly float[] previousValues = new float[KeyCount];
         private readonly object valueLock = new();
-        private readonly Thread pollThread;
+        private Thread? pollThread;
         private bool running;
+        private readonly bool available;
 
         // Thresholds for raising digital style events.  These can be tuned for
         // different behaviour.  The defaults work reasonably well for most
@@ -57,12 +58,24 @@ namespace InputToControllerMapper
         /// </summary>
         public WootingAnalogHandler()
         {
-            int res = Native.Initialise();
-            if (res != 0)
-                throw new InvalidOperationException($"Wooting Analog initialisation failed ({res})");
+            try
+            {
+                int res = Native.Initialise();
+                if (res != 0)
+                {
+                    available = false;
+                    return;
+                }
 
-            // Use ScanCode1 so the application can reference keys by scan code.
-            Native.SetKeyCodeMode(KeyCodeMode.ScanCode1);
+                // Use ScanCode1 so the application can reference keys by scan code.
+                Native.SetKeyCodeMode(KeyCodeMode.ScanCode1);
+                available = true;
+            }
+            catch (DllNotFoundException)
+            {
+                available = false;
+                return;
+            }
 
             running = true;
             pollThread = new Thread(PollLoop) { IsBackground = true };
@@ -122,7 +135,10 @@ namespace InputToControllerMapper
             if (pollThread != null && pollThread.IsAlive)
                 pollThread.Join();
 
-            Native.Uninitialize();
+            if (available)
+            {
+                try { Native.Uninitialize(); } catch { }
+            }
         }
     }
 
