@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
-using Core; // Remove this if not needed for your project
+using Core; // Remove if not needed in your structure
 
 namespace InputToControllerMapper
 {
@@ -69,7 +69,7 @@ namespace InputToControllerMapper
 
             try
             {
-                // Robust: supports both delegate and event handler
+                // Support both delegate (constructor) and event handler usage
                 wootingHandler = new WootingAnalogHandler(v =>
                 {
                     byte val = (byte)(Math.Clamp(v, 0f, 1f) * 255);
