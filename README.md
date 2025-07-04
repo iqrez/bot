@@ -1,2 +1,38 @@
-# CONTROLLER
-rewsk is dead
+# Input To Controller Mapper
+
+This project provides a Windows application for converting mouse and keyboard input into virtual gamepad actions. It includes a core library for processing input events and a Windows Forms UI for configuring mappings.
+
+## Prerequisites
+
+- **.NET 8.0 SDK**
+- **Windows 10/11** (required by the Windows Forms UI)
+- **ViGEm bus driver** – needed for creating virtual controllers
+- **Wooting analog SDK** – required if using analog features with supported keyboards
+
+The NuGet packages used by the project are restored automatically. Key dependencies include `Nefarius.ViGEm.Client` and `System.Text.Json`.
+
+## Build
+
+1. Clone the repository
+2. Restore dependencies and build the solution
+
+```bash
+dotnet build
+```
+
+## Run
+
+Launch the application from the `InputToControllerMapper` project:
+
+```bash
+dotnet run --project InputToControllerMapper
+```
+
+## Tests
+
+Unit tests live under the `Tests` folder and can be run with:
+
+```bash
+dotnet test
+```
+
