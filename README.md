@@ -36,3 +36,6 @@ Unit tests live under the `Tests` folder and can be run with:
 dotnet test
 ```
 
+The test suite builds a small native stub using `gcc`, so make sure a C
+compiler is available on your system.
+
