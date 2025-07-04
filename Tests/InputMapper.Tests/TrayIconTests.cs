@@ -2,11 +2,14 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+#if WINDOWS
 using System.Windows.Forms;
 using InputToControllerMapper;
 using InputToControllerMapper.UI;
 using Xunit;
+#endif
 
+#if WINDOWS
 namespace InputMapper.Tests;
 
 public class TrayIconTests
@@ -73,3 +76,4 @@ public class TrayIconTests
         Assert.Equal("B", list.SelectedItem);
     }
 }
+#endif

@@ -14,10 +14,10 @@ The NuGet packages used by the project are restored automatically. A key depende
 ## Build
 
 1. Clone the repository
-2. Restore dependencies and build the solution
+2. Restore dependencies and build the solution file
 
 ```bash
-dotnet build
+dotnet build InputToControllerMapper.sln
 ```
 
 ## Run
@@ -35,4 +35,7 @@ Unit tests live under the `Tests` folder and can be run with:
 ```bash
 dotnet test
 ```
+
+The test suite builds a small native stub using `gcc`, so make sure a C
+compiler is available on your system.
 

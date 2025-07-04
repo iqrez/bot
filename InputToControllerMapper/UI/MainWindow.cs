@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using InputToControllerMapper;
 using Core;
@@ -102,8 +103,12 @@ namespace InputToControllerMapper.UI
             mappingGrid.Rows.Clear();
             if (p != null)
             {
-                foreach (var kv in p.KeyBindings)
-                    mappingGrid.Rows.Add(kv.Key, kv.Value);
+                foreach (var m in p.Mappings)
+                {
+                    string input = $"{m.Type}:{m.Code}";
+                    string output = string.Join(", ", m.Actions.Select(a => $"{a.Element}:{a.Target}"));
+                    mappingGrid.Rows.Add(input, output);
+                }
             }
         }
 
