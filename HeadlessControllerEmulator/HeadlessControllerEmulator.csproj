@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>HeadlessControllerEmulator</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\Core.csproj" />
+    <Compile Include="..\InputToControllerMapper\Core\*.cs" Link="Core\%(FileName)%(Extension)" />
+    <Compile Include="..\InputToControllerMapper\MouseToStickConfig.cs" Link="MouseToStickConfig.cs" />
+    <Compile Include="..\InputToControllerMapper\VirtualControllerManager.cs" Link="VirtualControllerManager.cs" />
+  </ItemGroup>
+</Project>
