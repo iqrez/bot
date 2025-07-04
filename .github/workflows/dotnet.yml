@@ -1,0 +1,57 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build all projects
+        run: |
+          dotnet build ./Core/Core.csproj --configuration Release
+          dotnet build ./InputToControllerMapper/InputToControllerMapper.csproj --configuration Release
+          dotnet build ./Tests/InputMapper.Tests/InputMapper.Tests.csproj --configuration Release
+
+      - name: Build wooting stub
+        run: gcc -shared -o wooting_analog_wrapper.dll Tests/woot_stub/woot_stub.c
+
+      - name: Run tests
+        run: dotnet test ./Tests/InputMapper.Tests/InputMapper.Tests.csproj --no-build
+        env:
+          PATH: "${{ github.workspace }};${{ env.PATH }}"
+
+  codeql:
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build for CodeQL
+        run: dotnet build ./Tests/InputMapper.Tests/InputMapper.Tests.csproj --configuration Release
+
+      - uses: github/codeql-action/analyze@v3
