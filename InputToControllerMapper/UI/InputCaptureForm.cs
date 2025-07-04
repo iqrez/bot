@@ -6,6 +6,9 @@ using Nefarius.ViGEm.Client.Targets.Xbox360;
 
 namespace InputToControllerMapper
 {
+    /// <summary>
+    /// Diagnostic window for capturing raw input and displaying controller state.
+    /// </summary>
     public class InputCaptureForm : Form
     {
         private RawInputHandler rawInput;

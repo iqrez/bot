@@ -6,9 +6,10 @@ using System.Text.Json;
 
 namespace InputToControllerMapper
 {
+    /// <summary>Serializable application configuration.</summary>
     public class Settings
     {
-        public string ActiveProfile { get; set; } = "Default";
+        public string CurrentProfile { get; set; } = "Default";
         public Dictionary<string, string> ProcessProfiles { get; set; } = new Dictionary<string, string>();
 
         // Advanced/general app options
@@ -19,6 +20,9 @@ namespace InputToControllerMapper
         public bool CheckForUpdates { get; set; } = true;
     }
 
+    /// <summary>
+    /// Helper for reading and persisting <see cref="Settings"/> to disk.
+    /// </summary>
     public class SettingsManager
     {
         private readonly string filePath;
@@ -57,7 +61,7 @@ namespace InputToControllerMapper
 
         public string GetProfileForProcess(string processName)
         {
-            return settings.ProcessProfiles.TryGetValue(processName, out var profile) ? profile : settings.ActiveProfile;
+            return settings.ProcessProfiles.TryGetValue(processName, out var profile) ? profile : settings.CurrentProfile;
         }
 
         public void SetProfileForProcess(string processName, string profile)
@@ -66,9 +70,9 @@ namespace InputToControllerMapper
             Save();
         }
 
-        public void SetActiveProfile(string name)
+        public void SetCurrentProfile(string name)
         {
-            settings.ActiveProfile = name;
+            settings.CurrentProfile = name;
             Save();
         }
 
@@ -82,7 +86,7 @@ namespace InputToControllerMapper
             }
             catch
             {
-                return settings.ActiveProfile;
+                return settings.CurrentProfile;
             }
         }
     }

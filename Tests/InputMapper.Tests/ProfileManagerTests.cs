@@ -43,4 +43,19 @@ public class ProfileManagerTests
         if (Directory.Exists(dir))
             Directory.Delete(dir, true);
     }
+
+    [Fact]
+    public void SwitchingProfileRaisesEvent()
+    {
+        string app = "Evt" + Guid.NewGuid().ToString("N");
+        var mgr = new ProfileManager(app);
+        mgr.AddProfile(new Profile { Name = "Game" });
+        bool raised = false;
+        mgr.ProfileChanged += (_, __) => raised = true;
+        mgr.SetCurrentProfile("Game");
+        Assert.True(raised);
+        string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), app);
+        if (Directory.Exists(dir))
+            Directory.Delete(dir, true);
+    }
 }

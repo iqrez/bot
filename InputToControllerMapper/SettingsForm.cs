@@ -5,8 +5,9 @@ using Core;
 
 namespace InputToControllerMapper
 {
-    // UI dialog for modifying persistent user preferences.
-    // Merged after resolving conflicts with main (@iqrez)
+    /// <summary>
+    /// UI dialog for modifying persistent user preferences.
+    /// </summary>
     public class SettingsForm : Form
     {
         private readonly SettingsManager settingsManager;
