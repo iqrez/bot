@@ -15,8 +15,12 @@ namespace InputToControllerMapper
             string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "application.log");
             Logger.Initialize(logPath);
 
+            Logger.LogInfo("Application started");
+
             MainForm mainForm = new MainForm();
             Application.Run(mainForm);
+
+            Logger.LogInfo("Application shutting down");
 
             Logger.Shutdown();
         }

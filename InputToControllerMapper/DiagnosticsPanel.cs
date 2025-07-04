@@ -20,6 +20,15 @@ namespace InputToControllerMapper
             Logger.LogMessage += OnLogMessage;
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Logger.LogMessage -= OnLogMessage;
+            }
+            base.Dispose(disposing);
+        }
+
         private void OnLogMessage(Logger.LogLevel level, string message)
         {
             if (InvokeRequired)

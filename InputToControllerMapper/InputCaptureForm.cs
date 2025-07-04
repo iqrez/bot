@@ -47,7 +47,7 @@ namespace InputToControllerMapper
             catch (Exception ex)
             {
                 vigemPanel.BackColor = Color.Red;
-                Log("ViGEm init failed: " + ex.Message);
+                Log("ViGEm init failed: " + ex.Message, Logger.LogLevel.Error);
             }
 
             try
@@ -63,7 +63,7 @@ namespace InputToControllerMapper
             catch (Exception ex)
             {
                 rawPanel.BackColor = Color.Red;
-                Log("Raw input init failed: " + ex.Message);
+                Log("Raw input init failed: " + ex.Message, Logger.LogLevel.Error);
             }
 
             try
@@ -80,16 +80,27 @@ namespace InputToControllerMapper
             catch (Exception ex)
             {
                 wootingPanel.BackColor = Color.Red;
-                Log("Wooting init failed: " + ex.Message);
+                Log("Wooting init failed: " + ex.Message, Logger.LogLevel.Error);
             }
 
             WindowState = FormWindowState.Minimized;
         }
 
-        private void Log(string msg)
+        private void Log(string msg, Logger.LogLevel level = Logger.LogLevel.Info)
         {
             logBox.AppendText(msg + Environment.NewLine);
-            Logger.LogInfo(msg);
+            switch (level)
+            {
+                case Logger.LogLevel.Warning:
+                    Logger.LogWarning(msg);
+                    break;
+                case Logger.LogLevel.Error:
+                    Logger.LogError(msg);
+                    break;
+                default:
+                    Logger.LogInfo(msg);
+                    break;
+            }
         }
 
         private void OnKey(object sender, RawKeyEventArgs e)
@@ -135,6 +146,7 @@ namespace InputToControllerMapper
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            Logger.LogInfo("Input capture form closing");
             wootingHandler?.Dispose();
             rawInput?.Dispose();
             controller?.Disconnect();

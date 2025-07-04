@@ -55,6 +55,10 @@ namespace InputToControllerMapper
                 tray.ShowHideNotification();
                 Logger.LogInfo("Main window hidden to tray");
             }
+            else
+            {
+                Logger.LogInfo("Main window closing");
+            }
         }
 
         public void UpdateInputState(string text)
