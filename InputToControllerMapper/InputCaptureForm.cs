@@ -19,9 +19,18 @@ namespace InputToControllerMapper
 
         public InputCaptureForm()
         {
+            AutoScaleMode = AutoScaleMode.Dpi;
+            KeyPreview = true;
+
             wootingPanel = new Panel { Size = new Size(20, 20), Location = new Point(10, 10) };
+            wootingPanel.AccessibleName = "Wooting Status";
+            wootingPanel.TabIndex = 1;
             vigemPanel = new Panel { Size = new Size(20, 20), Location = new Point(40, 10) };
+            vigemPanel.AccessibleName = "ViGEm Status";
+            vigemPanel.TabIndex = 2;
             rawPanel = new Panel { Size = new Size(20, 20), Location = new Point(70, 10) };
+            rawPanel.AccessibleName = "Raw Input Status";
+            rawPanel.TabIndex = 3;
             Controls.Add(wootingPanel);
             Controls.Add(vigemPanel);
             Controls.Add(rawPanel);
@@ -34,6 +43,8 @@ namespace InputToControllerMapper
                 Size = new Size(360, 240),
                 Location = new Point(10, 40)
             };
+            logBox.AccessibleName = "Log";
+            logBox.TabIndex = 0;
             Controls.Add(logBox);
 
             try
@@ -83,6 +94,7 @@ namespace InputToControllerMapper
                 Log("Wooting init failed: " + ex.Message);
             }
 
+            ThemeManager.ApplyTheme(this);
             WindowState = FormWindowState.Minimized;
         }
 
