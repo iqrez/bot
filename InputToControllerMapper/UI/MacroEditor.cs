@@ -16,12 +16,29 @@ namespace InputToControllerMapper.UI
             Text = "Macro Editor";
             Size = new Size(400, 300);
 
-            text = new TextBox { Multiline = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical };
+            text = new TextBox
+            {
+                Multiline = true,
+                Dock = DockStyle.Fill,
+                ScrollBars = ScrollBars.Vertical,
+                TabIndex = 0,
+                AccessibleName = "Macro text",
+                AccessibleDescription = "JSON describing macro actions"
+            };
             Controls.Add(text);
 
-            okBtn = new Button { Text = "Close", Dock = DockStyle.Bottom };
+            okBtn = new Button
+            {
+                Text = "&Close",
+                Dock = DockStyle.Bottom,
+                TabIndex = 1,
+                AccessibleName = "Close",
+                AccessibleDescription = "Close the editor"
+            };
             okBtn.Click += (s, e) => Close();
             Controls.Add(okBtn);
+
+            AcceptButton = okBtn;
         }
     }
 }

@@ -20,9 +20,30 @@ namespace InputToControllerMapper
 
         public InputCaptureForm()
         {
-            wootingPanel = new Panel { Size = new Size(20, 20), Location = new Point(10, 10) };
-            vigemPanel = new Panel { Size = new Size(20, 20), Location = new Point(40, 10) };
-            rawPanel = new Panel { Size = new Size(20, 20), Location = new Point(70, 10) };
+            wootingPanel = new Panel
+            {
+                Size = new Size(20, 20),
+                Location = new Point(10, 10),
+                TabIndex = 0,
+                AccessibleName = "Wooting status",
+                AccessibleDescription = "Indicates Wooting analog connection status"
+            };
+            vigemPanel = new Panel
+            {
+                Size = new Size(20, 20),
+                Location = new Point(40, 10),
+                TabIndex = 1,
+                AccessibleName = "ViGEm status",
+                AccessibleDescription = "Indicates ViGEm connection status"
+            };
+            rawPanel = new Panel
+            {
+                Size = new Size(20, 20),
+                Location = new Point(70, 10),
+                TabIndex = 2,
+                AccessibleName = "Raw input status",
+                AccessibleDescription = "Indicates raw input initialization status"
+            };
             Controls.Add(wootingPanel);
             Controls.Add(vigemPanel);
             Controls.Add(rawPanel);
@@ -33,7 +54,10 @@ namespace InputToControllerMapper
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
                 Size = new Size(360, 240),
-                Location = new Point(10, 40)
+                Location = new Point(10, 40),
+                TabIndex = 3,
+                AccessibleName = "Log output",
+                AccessibleDescription = "Shows diagnostic messages"
             };
             Controls.Add(logBox);
 

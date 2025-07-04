@@ -22,20 +22,58 @@ namespace InputToControllerMapper
             Text = "Input To Controller Mapper";
             Size = new Size(800, 600);
 
-            profileList = new ListBox { Dock = DockStyle.Left, Width = 150 };
+            profileList = new ListBox
+            {
+                Dock = DockStyle.Left,
+                Width = 150,
+                TabIndex = 0,
+                AccessibleName = "Profile list",
+                AccessibleDescription = "Select a mapping profile"
+            };
             Controls.Add(profileList);
 
-            mappingGrid = new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false };
+            mappingGrid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = false,
+                TabIndex = 1,
+                AccessibleName = "Mapping grid",
+                AccessibleDescription = "Displays input to controller mappings"
+            };
             mappingGrid.Columns.Add("Input", "Input");
             mappingGrid.Columns.Add("Output", "Controller Output");
             Controls.Add(mappingGrid);
 
-            inputGroup = new GroupBox { Text = "Input State", Dock = DockStyle.Bottom, Height = 80 };
-            outputGroup = new GroupBox { Text = "Output State", Dock = DockStyle.Bottom, Height = 80 };
+            inputGroup = new GroupBox
+            {
+                Text = "Input State",
+                Dock = DockStyle.Bottom,
+                Height = 80,
+                TabIndex = 2,
+                AccessibleName = "Input state",
+                AccessibleDescription = "Shows recent input events"
+            };
+            outputGroup = new GroupBox
+            {
+                Text = "Output State",
+                Dock = DockStyle.Bottom,
+                Height = 80,
+                TabIndex = 3,
+                AccessibleName = "Output state",
+                AccessibleDescription = "Shows controller output"
+            };
             Controls.Add(outputGroup);
             Controls.Add(inputGroup);
 
-            settingsButton = new Button { Text = "Settings", Dock = DockStyle.Top, Height = 30 };
+            settingsButton = new Button
+            {
+                Text = "&Settings",
+                Dock = DockStyle.Top,
+                Height = 30,
+                TabIndex = 4,
+                AccessibleName = "Settings",
+                AccessibleDescription = "Open application settings"
+            };
             settingsButton.Click += (s, e) => {
                 using SettingsForm sf = new SettingsForm(settingsManager);
                 if (sf.ShowDialog() == DialogResult.OK)

@@ -20,14 +20,44 @@ namespace InputToControllerMapper.UI
             Text = "Profiles";
             Size = new Size(300, 400);
 
-            list = new ListBox { Dock = DockStyle.Fill };
+            list = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                TabIndex = 0,
+                AccessibleName = "Profile list",
+                AccessibleDescription = "Available profiles"
+            };
             Controls.Add(list);
 
             var panel = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 30 };
-            loadBtn = new Button { Text = "Load" };
-            saveBtn = new Button { Text = "Save" };
-            cloneBtn = new Button { Text = "Clone" };
-            deleteBtn = new Button { Text = "Delete" };
+            loadBtn = new Button
+            {
+                Text = "&Load",
+                TabIndex = 1,
+                AccessibleName = "Load profile",
+                AccessibleDescription = "Load the selected profile"
+            };
+            saveBtn = new Button
+            {
+                Text = "&Save",
+                TabIndex = 2,
+                AccessibleName = "Save profile",
+                AccessibleDescription = "Save changes to the selected profile"
+            };
+            cloneBtn = new Button
+            {
+                Text = "C&lone",
+                TabIndex = 3,
+                AccessibleName = "Clone profile",
+                AccessibleDescription = "Make a copy of the selected profile"
+            };
+            deleteBtn = new Button
+            {
+                Text = "&Delete",
+                TabIndex = 4,
+                AccessibleName = "Delete profile",
+                AccessibleDescription = "Remove the selected profile"
+            };
             panel.Controls.Add(loadBtn);
             panel.Controls.Add(saveBtn);
             panel.Controls.Add(cloneBtn);

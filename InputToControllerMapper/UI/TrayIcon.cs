@@ -30,23 +30,56 @@ namespace InputToControllerMapper
 
         private void BuildMenu()
         {
-            var menu = new ContextMenuStrip();
-            menu.Items.Add("Show", null, (s, e) => ShowMainForm());
+            var menu = new ContextMenuStrip
+            {
+                AccessibleName = "Tray menu",
+                AccessibleDescription = "Application options"
+            };
 
-            var enable = new ToolStripMenuItem("Enabled") { Checked = enabled, CheckOnClick = true };
+            var showItem = new ToolStripMenuItem("&Show")
+            {
+                AccessibleName = "Show main window",
+                AccessibleDescription = "Bring the main window to the front"
+            };
+            showItem.Click += (s, e) => ShowMainForm();
+            menu.Items.Add(showItem);
+
+            var enable = new ToolStripMenuItem("&Enabled")
+            {
+                Checked = enabled,
+                CheckOnClick = true,
+                AccessibleName = "Enable mappings",
+                AccessibleDescription = "Toggle input to controller mapping"
+            };
             enable.CheckedChanged += (s, e) => enabled = enable.Checked;
             menu.Items.Add(enable);
 
-            var profiles = new ToolStripMenuItem("Profiles");
+            var profiles = new ToolStripMenuItem("&Profiles")
+            {
+                AccessibleName = "Profiles",
+                AccessibleDescription = "Choose active profile"
+            };
             foreach (var p in manager.All)
             {
-                var item = new ToolStripMenuItem(p.Name) { Checked = p.Name == manager.ActiveProfile.Name };
+                var item = new ToolStripMenuItem(p.Name)
+                {
+                    Checked = p.Name == manager.ActiveProfile.Name,
+                    AccessibleName = p.Name,
+                    AccessibleDescription = $"Activate profile {p.Name}"
+                };
                 item.Click += (s, e) => { manager.SetActiveProfile(p.Name); BuildMenu(); };
                 profiles.DropDownItems.Add(item);
             }
             menu.Items.Add(profiles);
 
-            menu.Items.Add("Exit", null, (s, e) => Application.Exit());
+            var exitItem = new ToolStripMenuItem("E&xit")
+            {
+                AccessibleName = "Exit",
+                AccessibleDescription = "Close the application"
+            };
+            exitItem.Click += (s, e) => Application.Exit();
+            menu.Items.Add(exitItem);
+
             notifyIcon.ContextMenuStrip = menu;
         }
 

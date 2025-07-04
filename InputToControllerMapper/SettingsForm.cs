@@ -29,15 +29,63 @@ namespace InputToControllerMapper
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
 
-            startCheck = new CheckBox { Text = "Start with Windows", Location = new Point(10, 10), AutoSize = true };
+            startCheck = new CheckBox
+            {
+                Text = "&Start with Windows",
+                Location = new Point(10, 10),
+                AutoSize = true,
+                TabIndex = 0,
+                AccessibleName = "Start with Windows",
+                AccessibleDescription = "Launch the application when Windows starts"
+            };
 
-            profileCombo = new ComboBox { Location = new Point(10, 40), Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
-            themeCombo = new ComboBox { Location = new Point(10, 70), Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            profileCombo = new ComboBox
+            {
+                Location = new Point(10, 40),
+                Width = 200,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                TabIndex = 1,
+                AccessibleName = "Default profile",
+                AccessibleDescription = "Select the default profile"
+            };
+            themeCombo = new ComboBox
+            {
+                Location = new Point(10, 70),
+                Width = 200,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                TabIndex = 2,
+                AccessibleName = "Theme",
+                AccessibleDescription = "Choose light or dark theme"
+            };
 
-            diagnosticsCheck = new CheckBox { Text = "Enable diagnostics", Location = new Point(10, 100), AutoSize = true };
-            updateCheck = new CheckBox { Text = "Check for updates", Location = new Point(10, 130), AutoSize = true };
+            diagnosticsCheck = new CheckBox
+            {
+                Text = "Enable &diagnostics",
+                Location = new Point(10, 100),
+                AutoSize = true,
+                TabIndex = 3,
+                AccessibleName = "Enable diagnostics",
+                AccessibleDescription = "Turn on diagnostic logging"
+            };
+            updateCheck = new CheckBox
+            {
+                Text = "Check for &updates",
+                Location = new Point(10, 130),
+                AutoSize = true,
+                TabIndex = 4,
+                AccessibleName = "Check for updates",
+                AccessibleDescription = "Automatically check for application updates"
+            };
 
-            saveButton = new Button { Text = "Save", Location = new Point(10, 160), Width = 80 };
+            saveButton = new Button
+            {
+                Text = "&Save",
+                Location = new Point(10, 160),
+                Width = 80,
+                TabIndex = 5,
+                AccessibleName = "Save",
+                AccessibleDescription = "Save settings and close the dialog"
+            };
             saveButton.Click += (s, e) => Save();
 
             Controls.Add(startCheck);
@@ -48,6 +96,8 @@ namespace InputToControllerMapper
             Controls.Add(diagnosticsCheck);
             Controls.Add(updateCheck);
             Controls.Add(saveButton);
+
+            AcceptButton = saveButton;
 
             themeCombo.Items.AddRange(new object[] { "Light", "Dark" });
 
