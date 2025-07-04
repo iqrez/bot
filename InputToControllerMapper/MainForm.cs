@@ -16,17 +16,20 @@ namespace InputToControllerMapper
         public MainForm()
         {
             Text = "Input To Controller Mapper";
+            AccessibleName = "Main Window";
             Size = new Size(800, 600);
             AutoScaleMode = AutoScaleMode.Dpi;
             KeyPreview = true;
 
             profileList = new ListBox { Dock = DockStyle.Left, Width = 150 };
             profileList.AccessibleName = "Profile List";
+            profileList.AccessibleDescription = "Available mapping profiles";
             profileList.TabIndex = 0;
             Controls.Add(profileList);
 
             mappingGrid = new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false };
             mappingGrid.AccessibleName = "Mapping Grid";
+            mappingGrid.AccessibleDescription = "Configure input to controller mapping";
             mappingGrid.Columns.Add("Input", "Input");
             mappingGrid.Columns.Add("Output", "Controller Output");
             mappingGrid.TabIndex = 1;
@@ -35,6 +38,7 @@ namespace InputToControllerMapper
             themeBox = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
             themeBox.Items.AddRange(Enum.GetNames(typeof(Theme)));
             themeBox.AccessibleName = "Theme Selection";
+            themeBox.AccessibleDescription = "Choose between light and dark mode";
             themeBox.SelectedItem = ThemeManager.CurrentTheme.ToString();
             themeBox.SelectedIndexChanged += (s, e) =>
             {
@@ -46,9 +50,11 @@ namespace InputToControllerMapper
 
             inputGroup = new GroupBox { Text = "Input State", Dock = DockStyle.Bottom, Height = 80 };
             inputGroup.AccessibleName = "Input State";
+            inputGroup.AccessibleDescription = "Displays the last input event";
             inputGroup.TabIndex = 3;
             outputGroup = new GroupBox { Text = "Output State", Dock = DockStyle.Bottom, Height = 80 };
             outputGroup.AccessibleName = "Output State";
+            outputGroup.AccessibleDescription = "Shows the most recent controller output";
             outputGroup.TabIndex = 4;
             Controls.Add(outputGroup);
             Controls.Add(inputGroup);

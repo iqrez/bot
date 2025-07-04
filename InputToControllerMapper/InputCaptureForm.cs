@@ -22,15 +22,15 @@ namespace InputToControllerMapper
             AutoScaleMode = AutoScaleMode.Dpi;
             KeyPreview = true;
 
-            wootingPanel = new Panel { Size = new Size(20, 20), Location = new Point(10, 10) };
+            wootingPanel = new Panel { Size = new Size(20, 20), Location = new Point(10, 10), TabStop = false };
             wootingPanel.AccessibleName = "Wooting Status";
-            wootingPanel.TabIndex = 1;
-            vigemPanel = new Panel { Size = new Size(20, 20), Location = new Point(40, 10) };
+            wootingPanel.AccessibleDescription = "Shows the state of the Wooting analog SDK";
+            vigemPanel = new Panel { Size = new Size(20, 20), Location = new Point(40, 10), TabStop = false };
             vigemPanel.AccessibleName = "ViGEm Status";
-            vigemPanel.TabIndex = 2;
-            rawPanel = new Panel { Size = new Size(20, 20), Location = new Point(70, 10) };
+            vigemPanel.AccessibleDescription = "Shows if the virtual controller backend is connected";
+            rawPanel = new Panel { Size = new Size(20, 20), Location = new Point(70, 10), TabStop = false };
             rawPanel.AccessibleName = "Raw Input Status";
-            rawPanel.TabIndex = 3;
+            rawPanel.AccessibleDescription = "Indicates raw input availability";
             Controls.Add(wootingPanel);
             Controls.Add(vigemPanel);
             Controls.Add(rawPanel);
@@ -44,6 +44,7 @@ namespace InputToControllerMapper
                 Location = new Point(10, 40)
             };
             logBox.AccessibleName = "Log";
+            logBox.AccessibleDescription = "Lists recent input events and status messages";
             logBox.TabIndex = 0;
             Controls.Add(logBox);
 
