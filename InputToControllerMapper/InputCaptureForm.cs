@@ -122,7 +122,13 @@ namespace InputToControllerMapper
         {
             Logger.LogInfo("Input capture form closing");
             wootingHandler?.Dispose();
-            rawInput?.Dispose();
+            if (rawInput != null)
+            {
+                rawInput.KeyPressed -= OnKey;
+                rawInput.MouseMoved -= OnMouse;
+                rawInput.MouseButtonPressed -= OnButton;
+                rawInput.Dispose();
+            }
             controller?.Disconnect();
             controller?.Dispose();
             client?.Dispose();
