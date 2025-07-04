@@ -21,6 +21,8 @@ namespace InputToControllerMapper
         {
             AutoScaleMode = AutoScaleMode.Dpi;
             KeyPreview = true;
+            AccessibleName = "Input Capture";
+            AccessibleDescription = "Captures raw input and maps it to the virtual controller";
 
             wootingPanel = new Panel { Size = new Size(20, 20), Location = new Point(10, 10), TabStop = false };
             wootingPanel.AccessibleName = "Wooting Status";

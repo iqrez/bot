@@ -17,6 +17,7 @@ namespace InputToControllerMapper
         {
             Text = "Input To Controller Mapper";
             AccessibleName = "Main Window";
+            AccessibleDescription = "Primary interface for configuring input mapping";
             Size = new Size(800, 600);
             AutoScaleMode = AutoScaleMode.Dpi;
             KeyPreview = true;
@@ -47,6 +48,11 @@ namespace InputToControllerMapper
             };
             themeBox.TabIndex = 2;
             Controls.Add(themeBox);
+
+            Label themeLabel = new Label { Text = "Theme:", Dock = DockStyle.Top };
+            themeLabel.AccessibleName = "Theme Label";
+            themeLabel.AccessibleDescription = "Label for theme selection";
+            Controls.Add(themeLabel);
 
             inputGroup = new GroupBox { Text = "Input State", Dock = DockStyle.Bottom, Height = 80 };
             inputGroup.AccessibleName = "Input State";
