@@ -13,12 +13,24 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            Application.ThreadException += (s, e) => Logger.LogError("UI thread exception", e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                Logger.LogError("Unhandled exception", e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()));
+
             string appPath = Application.UserAppDataPath;
             Directory.CreateDirectory(appPath);
             var settingsManager = new SettingsManager(Path.Combine(appPath, "settings.json"));
 
             MainForm mainForm = new MainForm(settingsManager);
-            Application.Run(mainForm);
+            try
+            {
+                Application.Run(mainForm);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Fatal application error", ex);
+                throw;
+            }
         }
     }
 }

@@ -86,12 +86,14 @@ namespace InputToControllerMapper
         {
             while (running)
             {
-                for (ushort sc = 0; sc < KeyCount; sc++)
+                try
                 {
-                    float val;
-                    int ret = Native.ReadAnalog(0, sc, out val);
-                    if (ret != 0)
-                        val = 0f;
+                    for (ushort sc = 0; sc < KeyCount; sc++)
+                    {
+                        float val;
+                        int ret = Native.ReadAnalog(0, sc, out val);
+                        if (ret != 0)
+                            val = 0f;
 
                     float prev;
                     lock (valueLock)
@@ -105,11 +107,17 @@ namespace InputToControllerMapper
 
                     if (val >= PressThreshold && prev < PressThreshold)
                         KeyPressed?.Invoke(this, new AnalogKeyEventArgs(sc, val));
-                    if (val <= ReleaseThreshold && prev > ReleaseThreshold)
-                        KeyReleased?.Invoke(this, new AnalogKeyEventArgs(sc, val));
-                }
+                        if (val <= ReleaseThreshold && prev > ReleaseThreshold)
+                            KeyReleased?.Invoke(this, new AnalogKeyEventArgs(sc, val));
+                    }
 
-                Thread.Sleep(PollIntervalMs);
+                    Thread.Sleep(PollIntervalMs);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error in Wooting poll loop", ex);
+                    Thread.Sleep(PollIntervalMs);
+                }
             }
         }
 

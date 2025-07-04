@@ -101,43 +101,64 @@ namespace InputToControllerMapper
 
         private void OnKey(object sender, RawKeyEventArgs e)
         {
-            bool down = e.IsKeyDown;
-            switch (e.KeyCode)
+            try
             {
-                case Keys.W:
-                    controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)(down ? short.MaxValue : 0));
-                    break;
-                case Keys.S:
-                    controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)(down ? short.MinValue : 0));
-                    break;
-                case Keys.A:
-                    controller.SetAxisValue(Xbox360Axis.LeftThumbX, (short)(down ? short.MinValue : 0));
-                    break;
-                case Keys.D:
-                    controller.SetAxisValue(Xbox360Axis.LeftThumbX, (short)(down ? short.MaxValue : 0));
-                    break;
-                case Keys.Space:
-                    controller.SetButtonState(Xbox360Button.A, down);
-                    break;
+                bool down = e.IsKeyDown;
+                switch (e.KeyCode)
+                {
+                    case Keys.W:
+                        controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)(down ? short.MaxValue : 0));
+                        break;
+                    case Keys.S:
+                        controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)(down ? short.MinValue : 0));
+                        break;
+                    case Keys.A:
+                        controller.SetAxisValue(Xbox360Axis.LeftThumbX, (short)(down ? short.MinValue : 0));
+                        break;
+                    case Keys.D:
+                        controller.SetAxisValue(Xbox360Axis.LeftThumbX, (short)(down ? short.MaxValue : 0));
+                        break;
+                    case Keys.Space:
+                        controller.SetButtonState(Xbox360Button.A, down);
+                        break;
+                }
+                controller.SubmitReport();
+                Log("Key " + e.KeyCode + (down ? " down" : " up"));
             }
-            controller.SubmitReport();
-            Log("Key " + e.KeyCode + (down ? " down" : " up"));
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in key handler", ex);
+            }
         }
 
         private void OnMouse(object sender, RawMouseEventArgs e)
         {
-            controller.SetAxisValue(Xbox360Axis.RightThumbX, (short)e.DeltaX);
-            controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)e.DeltaY);
-            controller.SubmitReport();
+            try
+            {
+                controller.SetAxisValue(Xbox360Axis.RightThumbX, (short)e.DeltaX);
+                controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)e.DeltaY);
+                controller.SubmitReport();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in mouse move handler", ex);
+            }
         }
 
         private void OnButton(object sender, RawMouseButtonEventArgs e)
         {
-            if (e.IsLeftButton)
-                controller.SetSliderValue(Xbox360Slider.RightTrigger, (byte)(e.IsButtonDown ? 255 : 0));
-            if (e.IsRightButton)
-                controller.SetSliderValue(Xbox360Slider.LeftTrigger, (byte)(e.IsButtonDown ? 255 : 0));
-            controller.SubmitReport();
+            try
+            {
+                if (e.IsLeftButton)
+                    controller.SetSliderValue(Xbox360Slider.RightTrigger, (byte)(e.IsButtonDown ? 255 : 0));
+                if (e.IsRightButton)
+                    controller.SetSliderValue(Xbox360Slider.LeftTrigger, (byte)(e.IsButtonDown ? 255 : 0));
+                controller.SubmitReport();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in mouse button handler", ex);
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
