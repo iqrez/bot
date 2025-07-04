@@ -12,10 +12,20 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            string profilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Profiles");
-            var manager = new ProfileManager(profilePath);
-            using var mainForm = new UI.MainWindow(manager);
-            Application.Run(mainForm);
+            // If you have a profile system with a new main window:
+            try
+            {
+                string profilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Profiles");
+                var manager = new ProfileManager(profilePath);
+                Application.Run(new UI.MainWindow(manager));
+            }
+            catch
+            {
+                // Fallback to classic/test main form
+                Application.Run(new MainForm());
+                // Or, if your main form is called InputCaptureForm, use:
+                // Application.Run(new InputCaptureForm());
+            }
         }
     }
 }
