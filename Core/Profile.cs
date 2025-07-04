@@ -1,39 +1,85 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace Controller.Core
+namespace Core
 {
+    public enum InputType
+    {
+        Key,
+        MouseButton,
+        MouseMoveX,
+        MouseMoveY,
+        Analog
+    }
+
+    public enum MouseButton
+    {
+        Left,
+        Right,
+        Middle,
+        X1,
+        X2
+    }
+
+    public enum ControllerElement
+    {
+        Button,
+        Axis,
+        Trigger,
+        DPad
+    }
+
+    public enum CurveType
+    {
+        Linear,
+        Squared
+    }
+
+    public class AnalogOptions
+    {
+        public float Deadzone { get; set; } = 0f;
+        public float Sensitivity { get; set; } = 1f;
+        public CurveType Curve { get; set; } = CurveType.Linear;
+    }
+
+    public class ControllerAction
+    {
+        public ControllerElement Element { get; set; }
+        public string Target { get; set; } = string.Empty;
+        public AnalogOptions? AnalogOptions { get; set; }
+    }
+
+    public class InputMapping
+    {
+        public InputType Type { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public List<ControllerAction> Actions { get; set; } = new();
+    }
+
     public class Profile
     {
-        public const int CurrentVersion = 1;
-
-        public int Version { get; set; } = CurrentVersion;
         public string Name { get; set; } = "Default";
-        public Dictionary<string, string> KeyBindings { get; set; } = new();
+        public List<InputMapping> Mappings { get; set; } = new();
 
-        public static Profile FromJson(string json)
+        public static Profile Load(string path)
         {
-            using var doc = JsonDocument.Parse(json);
-            return FromJsonElement(doc.RootElement);
+            string json = File.ReadAllText(path);
+            var options = new JsonSerializerOptions
+            {
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+            return JsonSerializer.Deserialize<Profile>(json, options) ?? new Profile();
         }
 
-        public static Profile FromJsonElement(JsonElement element)
+        public void Save(string path)
         {
-            var profile = new Profile
-            {
-                Version = element.TryGetProperty("Version", out var v) && v.ValueKind == JsonValueKind.Number
-                    ? v.GetInt32() : CurrentVersion,
-                Name = element.TryGetProperty("Name", out var n) ? n.GetString() ?? "Default" : "Default"
-            };
-
-            if (element.TryGetProperty("KeyBindings", out var bindings) && bindings.ValueKind == JsonValueKind.Object)
-            {
-                foreach (var prop in bindings.EnumerateObject())
-                    profile.KeyBindings[prop.Name] = prop.Value.GetString() ?? string.Empty;
-            }
-
-            profile.Version = CurrentVersion;
-            return profile;
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(this, options);
+            File.WriteAllText(path, json);
         }
     }
 }

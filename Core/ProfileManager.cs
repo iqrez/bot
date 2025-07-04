@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 
-namespace Controller.Core
+namespace Core
 {
     public class ProfileChangedEventArgs : EventArgs
     {
@@ -57,8 +57,7 @@ namespace Controller.Core
             {
                 try
                 {
-                    string json = File.ReadAllText(file);
-                    var profile = Profile.FromJson(json);
+                    var profile = Profile.Load(file);
                     profile.Name = Path.GetFileNameWithoutExtension(file);
                     profiles[profile.Name] = profile;
                 }
@@ -92,9 +91,8 @@ namespace Controller.Core
 
         public void SaveProfile(Profile profile)
         {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(profile, options);
-            File.WriteAllText(Path.Combine(profilesDir, profile.Name + ".json"), json);
+            string path = Path.Combine(profilesDir, profile.Name + ".json");
+            profile.Save(path);
         }
 
         public bool AddProfile(Profile profile)
@@ -128,7 +126,8 @@ namespace Controller.Core
         {
             if (!profiles.TryGetValue(sourceName, out var src) || profiles.ContainsKey(newName))
                 return false;
-            var clone = JsonSerializer.Deserialize<Profile>(JsonSerializer.Serialize(src)) ?? new Profile();
+            string path = Path.Combine(profilesDir, sourceName + ".json");
+            var clone = Profile.Load(path);
             clone.Name = newName;
             return AddProfile(clone);
         }
