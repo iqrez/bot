@@ -2,15 +2,8 @@ using System;
 
 namespace InputToControllerMapper
 {
-    /// <summary>
-    /// Shapes available when converting mouse magnitude to stick output.
-    /// </summary>
-    public enum StickCurveShape
-    {
-        Linear,
-        Exponential,
-        DualZone
-    }
+    // Reuse StickCurve enum from MouseToStickConfig rather than defining a
+    // duplicate set of curve options here.
 
     /// <summary>
     /// Translates raw mouse movement into normalized stick values.
@@ -75,11 +68,11 @@ namespace InputToControllerMapper
 
             switch (config.Curve)
             {
-                case StickCurveShape.Linear:
+                case StickCurve.Linear:
                     return value;
-                case StickCurveShape.Exponential:
+                case StickCurve.Exponential:
                     return MathF.Pow(value, config.Exponent);
-                case StickCurveShape.DualZone:
+                case StickCurve.DualZone:
                     if (value < config.DualZoneThreshold)
                     {
                         float inner = value / config.DualZoneThreshold;
