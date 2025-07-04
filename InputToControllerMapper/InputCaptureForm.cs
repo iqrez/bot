@@ -89,6 +89,7 @@ namespace InputToControllerMapper
         private void Log(string msg)
         {
             logBox.AppendText(msg + Environment.NewLine);
+            Logger.LogInfo(msg);
         }
 
         private void OnKey(object sender, RawKeyEventArgs e)
