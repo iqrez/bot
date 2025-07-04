@@ -45,7 +45,14 @@ namespace InputToControllerMapper
             string entry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] {message}";
             lock (lockObj)
             {
-                writer?.WriteLine(entry);
+                try
+                {
+                    writer?.WriteLine(entry);
+                }
+                catch
+                {
+                    // ignore logging failures
+                }
             }
             LogMessage?.Invoke(level, entry);
         }
