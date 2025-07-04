@@ -23,9 +23,9 @@ public class MappingEngineTests
     [Fact]
     public void ApplyActionsSetsControllerState()
     {
-        var engine = (InputToControllerMapper.MappingEngine)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(InputToControllerMapper.MappingEngine));
-        var controllerField = typeof(InputToControllerMapper.MappingEngine).GetField("controller", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var clientField = typeof(InputToControllerMapper.MappingEngine).GetField("client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var engine = (InputToControllerMapper.ControllerMappingEngine)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(InputToControllerMapper.ControllerMappingEngine));
+        var controllerField = typeof(InputToControllerMapper.ControllerMappingEngine).GetField("controller", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var clientField = typeof(InputToControllerMapper.ControllerMappingEngine).GetField("client", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var dummy = new DummyController();
         controllerField.SetValue(engine, dummy);
         clientField.SetValue(engine, null);
