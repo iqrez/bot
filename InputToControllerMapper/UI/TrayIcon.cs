@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace InputToControllerMapper.UI
+namespace InputToControllerMapper
 {
     public class TrayIcon : IDisposable
     {
@@ -61,6 +61,13 @@ namespace InputToControllerMapper.UI
             {
                 mainForm.Show();
             }
+        }
+
+        public void ShowHideNotification()
+        {
+            notifyIcon.BalloonTipTitle = "Input To Controller Mapper";
+            notifyIcon.BalloonTipText = "Application is still running";
+            notifyIcon.ShowBalloonTip(1000);
         }
 
         public void Dispose()
