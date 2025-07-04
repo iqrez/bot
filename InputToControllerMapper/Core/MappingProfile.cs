@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Core;
 
 namespace InputToControllerMapper
 {
@@ -35,13 +36,6 @@ namespace InputToControllerMapper
     {
         Linear,
         Squared
-    }
-
-    public class AnalogOptions
-    {
-        public float Deadzone { get; set; } = 0f;
-        public float Sensitivity { get; set; } = 1f;
-        public CurveType Curve { get; set; } = CurveType.Linear;
     }
 
     public class ControllerAction
