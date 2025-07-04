@@ -1,143 +1,142 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Runtime.InteropServices;
 
 namespace InputToControllerMapper
 {
     /// <summary>
-    /// Handles polling of analog values from a Wooting keyboard using the
-    /// official Analog SDK.  Values are read in the background and can be
-    /// queried at any time.  Optional events are raised when the analog value
-    /// crosses configured thresholds to facilitate Dual Keystroke or Rapid
-    /// Trigger behaviour.
+    /// Provides access to Wooting keyboards via the official analog SDK.
+    /// Values are polled in the background and events are raised when the
+    /// state of a key changes.
     /// </summary>
-    public class WootingAnalogHandler : IDisposable
+    public sealed class WootingAnalogHandler : IDisposable
     {
-        // Import of the required functions from the SDK wrapper.  They are
-        // placed here so the file is self contained.
         private static class Native
         {
-            [DllImport("wooting_analog_wrapper.dll", EntryPoint = "wooting_analog_initialise")]
+            [DllImport("wooting_analog_wrapper.dll", CallingConvention = CallingConvention.Cdecl)]
             public static extern int Initialise();
-            [DllImport("wooting_analog_wrapper.dll", EntryPoint = "wooting_analog_uninitialize")]
-            public static extern int Uninitialize();
-            [DllImport("wooting_analog_wrapper.dll", EntryPoint = "wooting_analog_set_key_mode")]
-            public static extern int SetKeyCodeMode(KeyCodeMode mode);
-            [DllImport("wooting_analog_wrapper.dll", EntryPoint = "wooting_analog_read")]
-            public static extern int ReadAnalog(uint device, ushort scanCode, out float value);
+            [DllImport("wooting_analog_wrapper.dll", CallingConvention = CallingConvention.Cdecl)]
+            public static extern int Uninitialise();
+            [DllImport("wooting_analog_wrapper.dll", CallingConvention = CallingConvention.Cdecl)]
+            public static extern float ReadAnalog(int keycode);
         }
 
-        /// <summary>Number of scan codes that are polled.</summary>
         private const int KeyCount = 256;
-        /// <summary>Polling interval in milliseconds.</summary>
-        private const int PollIntervalMs = 5;
-
         private readonly float[] values = new float[KeyCount];
-        private readonly float[] previousValues = new float[KeyCount];
-        private readonly object valueLock = new();
+        private readonly DKSStage[] dksStages = new DKSStage[KeyCount];
+        private readonly bool[] rapidStates = new bool[KeyCount];
+
+        public int PollRateHz
+        {
+            get => pollRateHz;
+            set => pollRateHz = Math.Clamp(value, 250, 1000);
+        }
+        private int pollRateHz = 500; // default 500Hz
+
+        public float DksStage1Threshold { get; set; } = 0.2f;
+        public float DksStage2Threshold { get; set; } = 0.8f;
+        public float RapidPressThreshold { get; set; } = 0.8f;
+        public float RapidReleaseThreshold { get; set; } = 0.2f;
+
+        public event Action<int, float>? AnalogValueChanged;
+        public event Action<int, DKSStage>? DKSStageChanged;
+        public event Action<int, bool>? RapidTriggerFired;
+
         private readonly Thread pollThread;
-        private bool running;
+        private volatile bool running;
 
-        // Thresholds for raising digital style events.  These can be tuned for
-        // different behaviour.  The defaults work reasonably well for most
-        // scenarios.
-        public float PressThreshold { get; set; } = 0.8f;
-        public float ReleaseThreshold { get; set; } = 0.2f;
-
-        /// <summary>Raised when a key's analog value exceeds <see cref="PressThreshold"/>.</summary>
-        public event EventHandler<AnalogKeyEventArgs> KeyPressed;
-        /// <summary>Raised when a key's analog value goes below <see cref="ReleaseThreshold"/>.</summary>
-        public event EventHandler<AnalogKeyEventArgs> KeyReleased;
-        /// <summary>Raised every poll with the current value of a key.</summary>
-        public event EventHandler<AnalogKeyEventArgs> AnalogValueUpdated;
-
-        /// <summary>
-        /// Initialises the SDK and starts polling in the background.
-        /// </summary>
         public WootingAnalogHandler()
         {
-            int res = Native.Initialise();
+            int res = 0;
+            try
+            {
+                res = Native.Initialise();
+            }
+            catch (DllNotFoundException ex)
+            {
+                throw new InvalidOperationException("Wooting analog SDK not found", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to initialise Wooting SDK", ex);
+            }
             if (res != 0)
-                throw new InvalidOperationException($"Wooting Analog initialisation failed ({res})");
-
-            // Use ScanCode1 so the application can reference keys by scan code.
-            Native.SetKeyCodeMode(KeyCodeMode.ScanCode1);
+                throw new InvalidOperationException($"Wooting initialisation failed ({res})");
 
             running = true;
             pollThread = new Thread(PollLoop) { IsBackground = true };
             pollThread.Start();
         }
 
-        /// <summary>
-        /// Gets the latest analog value for the specified scan code.
-        /// </summary>
-        public float GetAnalogValue(ushort scanCode)
-        {
-            lock (valueLock)
-            {
-                if (scanCode < values.Length)
-                    return values[scanCode];
-            }
-            return 0f;
-        }
-
         private void PollLoop()
         {
+            int delay = 1000 / PollRateHz;
+            if (delay <= 0) delay = 1;
+
             while (running)
             {
-                for (ushort sc = 0; sc < KeyCount; sc++)
+                for (int key = 0; key < KeyCount; key++)
                 {
                     float val;
-                    int ret = Native.ReadAnalog(0, sc, out val);
-                    if (ret != 0)
-                        val = 0f;
-
-                    float prev;
-                    lock (valueLock)
+                    try
                     {
-                        prev = values[sc];
-                        previousValues[sc] = prev;
-                        values[sc] = val;
+                        val = Native.ReadAnalog(key);
+                    }
+                    catch
+                    {
+                        val = 0f;
                     }
 
-                    AnalogValueUpdated?.Invoke(this, new AnalogKeyEventArgs(sc, val));
+                    if (Math.Abs(val - values[key]) > float.Epsilon)
+                    {
+                        values[key] = val;
+                        AnalogValueChanged?.Invoke(key, val);
+                    }
 
-                    if (val >= PressThreshold && prev < PressThreshold)
-                        KeyPressed?.Invoke(this, new AnalogKeyEventArgs(sc, val));
-                    if (val <= ReleaseThreshold && prev > ReleaseThreshold)
-                        KeyReleased?.Invoke(this, new AnalogKeyEventArgs(sc, val));
+                    DKSStage stage = GetStage(val);
+                    if (stage != dksStages[key])
+                    {
+                        dksStages[key] = stage;
+                        DKSStageChanged?.Invoke(key, stage);
+                    }
+
+                    bool pressed = rapidStates[key];
+                    bool nextPressed = pressed ? val >= RapidReleaseThreshold : val >= RapidPressThreshold;
+                    if (pressed != nextPressed)
+                    {
+                        rapidStates[key] = nextPressed;
+                        RapidTriggerFired?.Invoke(key, nextPressed);
+                    }
                 }
 
-                Thread.Sleep(PollIntervalMs);
+                Thread.Sleep(delay);
             }
         }
 
-        /// <summary>
-        /// Stops polling and uninitialises the SDK.
-        /// </summary>
+        private DKSStage GetStage(float value)
+        {
+            if (value >= DksStage2Threshold)
+                return DKSStage.Stage2;
+            if (value >= DksStage1Threshold)
+                return DKSStage.Stage1;
+            return DKSStage.None;
+        }
+
         public void Dispose()
         {
             running = false;
-            if (pollThread != null && pollThread.IsAlive)
-                pollThread.Join();
-
-            Native.Uninitialize();
+            if (pollThread.IsAlive)
+            {
+                try { pollThread.Join(); } catch { }
+            }
+            try { Native.Uninitialise(); } catch { }
         }
     }
 
-    /// <summary>Event data for analog key events.</summary>
-    public class AnalogKeyEventArgs : EventArgs
+    public enum DKSStage
     {
-        public ushort ScanCode { get; }
-        public float Value { get; }
-        public AnalogKeyEventArgs(ushort scanCode, float value)
-        {
-            ScanCode = scanCode;
-            Value = value;
-        }
+        None,
+        Stage1,
+        Stage2
     }
-
-    /// <summary>Possible key code modes for the SDK.</summary>
-    public enum KeyCodeMode { HID = 0, ScanCode1 = 1, VirtualKey = 2 }
 }

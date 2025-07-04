@@ -68,12 +68,13 @@ namespace InputToControllerMapper
 
             try
             {
-                wootingHandler = new WootingAnalogHandler(v =>
+                wootingHandler = new WootingAnalogHandler();
+                wootingHandler.AnalogValueChanged += (_, value) =>
                 {
-                    byte val = (byte)(v * 255);
+                    byte val = (byte)(Math.Clamp(value, 0f, 1f) * 255);
                     controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
                     controller.SubmitReport();
-                });
+                };
                 wootingPanel.BackColor = Color.Green;
                 Log("Wooting ready");
             }
