@@ -49,7 +49,13 @@ namespace InputToControllerMapper
             Controls.Add(settingsButton);
 
             FormClosing += OnFormClosing;
+
+            // Always instantiate tray with profileManager for new branch compatibility
             tray = new TrayIcon(this, profileManager);
+
+            // Properly dispose tray on exit or close
+            Application.ApplicationExit += (s, e) => tray.Dispose();
+            FormClosed += (s, e) => tray.Dispose();
 
             ApplyTheme();
         }
