@@ -37,13 +37,6 @@ namespace InputToControllerMapper
         Squared
     }
 
-    public class AnalogOptions
-    {
-        public float Deadzone { get; set; } = 0f;
-        public float Sensitivity { get; set; } = 1f;
-        public CurveType Curve { get; set; } = CurveType.Linear;
-    }
-
     public class ControllerAction
     {
         public ControllerElement Element { get; set; }

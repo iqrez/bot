@@ -1,19 +1,27 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Core;
 
 namespace InputToControllerMapper
 {
     public class MainForm : Form
     {
+        private readonly SettingsManager settingsManager;
+        private readonly ProfileManager profileManager;
+
         private ListBox profileList;
         private DataGridView mappingGrid;
         private GroupBox inputGroup;
         private GroupBox outputGroup;
         private TrayIcon tray;
+        private Button settingsButton;
 
-        public MainForm()
+        public MainForm(SettingsManager settings, ProfileManager profiles)
         {
+            settingsManager = settings;
+            profileManager = profiles;
+
             Text = "Input To Controller Mapper";
             Size = new Size(800, 600);
 
@@ -30,8 +38,20 @@ namespace InputToControllerMapper
             Controls.Add(outputGroup);
             Controls.Add(inputGroup);
 
+            settingsButton = new Button { Text = "Settings", Dock = DockStyle.Top, Height = 30 };
+            settingsButton.Click += (s, e) => {
+                using SettingsForm sf = new SettingsForm(settingsManager);
+                if (sf.ShowDialog() == DialogResult.OK)
+                {
+                    ApplyTheme();
+                }
+            };
+            Controls.Add(settingsButton);
+
             FormClosing += OnFormClosing;
-            tray = new TrayIcon(this);
+            tray = new TrayIcon(this, profileManager);
+
+            ApplyTheme();
         }
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)
@@ -52,6 +72,20 @@ namespace InputToControllerMapper
         public void UpdateOutputState(string text)
         {
             outputGroup.Text = "Output State: " + text;
+        }
+
+        private void ApplyTheme()
+        {
+            if (settingsManager.Current.Theme == "Dark")
+            {
+                BackColor = Color.FromArgb(45, 45, 48);
+                ForeColor = Color.White;
+            }
+            else
+            {
+                BackColor = SystemColors.Control;
+                ForeColor = SystemColors.ControlText;
+            }
         }
     }
 }
