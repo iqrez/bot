@@ -7,11 +7,19 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../InputToControllerMapper/InputToControllerMapper.csproj" />
+    <ProjectReference Include="../../InputToControllerMapper/InputToControllerMapper.csproj" Condition="'$(OS)' == 'Windows_NT'" />
+    <ProjectReference Include="../../Core/Core.csproj" Condition="'$(OS)' != 'Windows_NT'" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="woot_stub/woot_stub.c" />
+  </ItemGroup>
+
+  <Target Name="BuildWootStub" BeforeTargets="Build" Condition="'$(OS)' != 'Windows_NT'">
+    <Exec Command="gcc -shared -fPIC &quot;$(MSBuildThisFileDirectory)woot_stub/woot_stub.c&quot; -o &quot;$(OutDir)wooting_analog_wrapper.dll&quot;" />
+  </Target>
 </Project>
