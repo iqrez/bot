@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
-using Core; // Keep this if WootingAnalogHandler and other classes are in Core namespace
+using Core; // Remove this if not needed for your project
 
 namespace InputToControllerMapper
 {
@@ -69,14 +69,13 @@ namespace InputToControllerMapper
 
             try
             {
-                // Support both delegate (constructor) and event handler usage
+                // Robust: supports both delegate and event handler
                 wootingHandler = new WootingAnalogHandler(v =>
                 {
                     byte val = (byte)(Math.Clamp(v, 0f, 1f) * 255);
                     controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
                     controller.SubmitReport();
                 });
-                // If the implementation also supports the event, wire it as well
                 wootingHandler.AnalogValueChanged += (_, value) =>
                 {
                     byte val = (byte)(Math.Clamp(value, 0f, 1f) * 255);
