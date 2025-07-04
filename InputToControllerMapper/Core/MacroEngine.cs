@@ -208,7 +208,7 @@ namespace InputToControllerMapper
                 return;
 
             MacroStarted?.Invoke(this, name);
-            
+
             try
             {
                 int count = repeatOverride == 0 ? macro.Repeat : repeatOverride;
@@ -250,4 +250,3 @@ namespace InputToControllerMapper
         }
     }
 }
-
