@@ -12,8 +12,7 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            InputCaptureForm mainForm = new InputCaptureForm();
-            mainForm.WindowState = FormWindowState.Minimized;
+            MainForm mainForm = new MainForm();
             Application.Run(mainForm);
         }
     }
