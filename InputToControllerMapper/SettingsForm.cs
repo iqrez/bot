@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Core;
 
 namespace InputToControllerMapper
 {
@@ -103,7 +104,7 @@ namespace InputToControllerMapper
 
             if (profileManager != null)
             {
-                foreach (var p in profileManager.All)
+                foreach (var p in profileManager.Profiles)
                 {
                     profileCombo.Items.Add(p.Name);
                 }

@@ -4,7 +4,6 @@ using System.Linq;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
 using System.Windows.Forms;
-using Core;
 
 namespace InputToControllerMapper
 {
@@ -79,7 +78,7 @@ namespace InputToControllerMapper
             value = Math.Clamp(value, -1f, 1f);
             return opts.Curve switch
             {
-                CurveType.Squared => MathF.Sign(value) * value * value,
+                global::Core.CurveType.Squared => MathF.Sign(value) * value * value,
                 _ => value
             };
         }

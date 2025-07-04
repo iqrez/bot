@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using InputToControllerMapper;
+using Core;
 
 namespace InputToControllerMapper.UI
 {
@@ -77,16 +78,16 @@ namespace InputToControllerMapper.UI
         private void RefreshList()
         {
             list.Items.Clear();
-            foreach (var p in manager.All)
+            foreach (var p in manager.Profiles)
                 list.Items.Add(p.Name);
-            list.SelectedItem = manager.ActiveProfile.Name;
+            list.SelectedItem = manager.CurrentProfile.Name;
         }
 
         private void LoadSelected()
         {
             if (SelectedName != null)
             {
-                manager.SetActiveProfile(SelectedName);
+                manager.SetCurrentProfile(SelectedName);
                 RefreshList();
             }
         }

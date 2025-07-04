@@ -9,7 +9,7 @@ This project provides a Windows application for converting mouse and keyboard in
 - **ViGEm bus driver** – needed for creating virtual controllers
 - **Wooting analog SDK** – required if using analog features with supported keyboards
 
-The NuGet packages used by the project are restored automatically. Key dependencies include `Nefarius.ViGEm.Client` and `System.Text.Json`.
+The NuGet packages used by the project are restored automatically. A key dependency is `Nefarius.ViGEm.Client`.
 
 ## Build
 

@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Windows.Forms;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
-using Core; // Remove if not needed in your structure
 
 namespace InputToControllerMapper
 {

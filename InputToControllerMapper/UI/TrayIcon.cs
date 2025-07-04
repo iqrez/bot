@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Core;
 
 namespace InputToControllerMapper
 {
@@ -54,20 +55,25 @@ namespace InputToControllerMapper
             enable.CheckedChanged += (s, e) => enabled = enable.Checked;
             menu.Items.Add(enable);
 
+            // Profile menu (using manager.Profiles and manager.ActiveProfile)
             var profiles = new ToolStripMenuItem("&Profiles")
             {
                 AccessibleName = "Profiles",
                 AccessibleDescription = "Choose active profile"
             };
-            foreach (var p in manager.All)
+            foreach (var p in manager.Profiles)
             {
                 var item = new ToolStripMenuItem(p.Name)
                 {
-                    Checked = p.Name == manager.ActiveProfile.Name,
+                    Checked = manager.ActiveProfile != null && p.Name == manager.ActiveProfile.Name,
                     AccessibleName = p.Name,
                     AccessibleDescription = $"Activate profile {p.Name}"
                 };
-                item.Click += (s, e) => { manager.SetActiveProfile(p.Name); BuildMenu(); };
+                item.Click += (s, e) =>
+                {
+                    manager.SetActiveProfile(p.Name);
+                    BuildMenu();
+                };
                 profiles.DropDownItems.Add(item);
             }
             menu.Items.Add(profiles);
