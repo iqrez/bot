@@ -32,12 +32,12 @@ namespace InputToControllerMapper
                 controller = client.CreateXbox360Controller();
                 controller.Connect();
                 vigemPanel.BackColor = Color.Green;
-                Log("ViGEm connected");
+                Logger.LogInfo("ViGEm connected");
             }
             catch (Exception ex)
             {
                 vigemPanel.BackColor = Color.Red;
-                Log("ViGEm init failed: " + ex.Message, Logger.LogLevel.Error);
+                Logger.LogError("ViGEm init failed: " + ex.Message);
             }
 
             try
@@ -48,12 +48,12 @@ namespace InputToControllerMapper
                 rawInput.MouseMoved += OnMouse;
                 rawInput.MouseButtonPressed += OnButton;
                 rawPanel.BackColor = Color.Green;
-                Log("Raw input ready");
+                Logger.LogInfo("Raw input ready");
             }
             catch (Exception ex)
             {
                 rawPanel.BackColor = Color.Red;
-                Log("Raw input init failed: " + ex.Message, Logger.LogLevel.Error);
+                Logger.LogError("Raw input init failed: " + ex.Message);
             }
 
             try
@@ -65,32 +65,17 @@ namespace InputToControllerMapper
                     controller.SubmitReport();
                 });
                 wootingPanel.BackColor = Color.Green;
-                Log("Wooting ready");
+                Logger.LogInfo("Wooting ready");
             }
             catch (Exception ex)
             {
                 wootingPanel.BackColor = Color.Red;
-                Log("Wooting init failed: " + ex.Message, Logger.LogLevel.Error);
+                Logger.LogError("Wooting init failed: " + ex.Message);
             }
 
             WindowState = FormWindowState.Minimized;
         }
 
-        private void Log(string msg, Logger.LogLevel level = Logger.LogLevel.Info)
-        {
-            switch (level)
-            {
-                case Logger.LogLevel.Warning:
-                    Logger.LogWarning(msg);
-                    break;
-                case Logger.LogLevel.Error:
-                    Logger.LogError(msg);
-                    break;
-                default:
-                    Logger.LogInfo(msg);
-                    break;
-            }
-        }
 
         private void OnKey(object sender, RawKeyEventArgs e)
         {
@@ -114,7 +99,7 @@ namespace InputToControllerMapper
                     break;
             }
             controller.SubmitReport();
-            Log("Key " + e.KeyCode + (down ? " down" : " up"));
+            Logger.LogInfo("Key " + e.KeyCode + (down ? " down" : " up"));
         }
 
         private void OnMouse(object sender, RawMouseEventArgs e)
