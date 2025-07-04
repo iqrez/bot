@@ -34,6 +34,9 @@ namespace Controller.Core
         }
 
         public IEnumerable<Profile> Profiles => profiles.Values;
+        public IEnumerable<string> ProfileNames => profiles.Keys;
+        public bool HasProfile(string name) => profiles.ContainsKey(name);
+        public Profile? GetProfile(string name) => profiles.TryGetValue(name, out var p) ? p : null;
         public Profile CurrentProfile => current ?? throw new InvalidOperationException("No profile loaded");
 
         private void Load()
@@ -140,6 +143,8 @@ namespace Controller.Core
             ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(p));
             return true;
         }
+
+        public void SaveCurrentProfile() => SaveProfile(CurrentProfile);
 
         public string ResolveProfile(string process, string windowTitle)
         {
