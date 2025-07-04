@@ -12,7 +12,9 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            MainForm mainForm = new MainForm();
+            string profilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Profiles");
+            var manager = new ProfileManager(profilePath);
+            using var mainForm = new UI.MainWindow(manager);
             Application.Run(mainForm);
         }
     }

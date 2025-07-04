@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace InputToControllerMapper
@@ -76,6 +77,42 @@ namespace InputToControllerMapper
         {
             profiles.TryGetValue(name, out var p);
             return p;
+        }
+
+        public void CreateProfile(string name)
+        {
+            if (profiles.ContainsKey(name))
+                throw new InvalidOperationException("Profile already exists");
+            var p = new Profile { Name = name };
+            profiles[name] = p;
+            SaveProfile(p);
+        }
+
+        public void DeleteProfile(string name)
+        {
+            if (!profiles.Remove(name))
+                return;
+            string path = Path.Combine(profilesPath, name + ".json");
+            if (File.Exists(path))
+                File.Delete(path);
+            if (activeProfile.Name == name)
+            {
+                activeProfile = profiles.Values.FirstOrDefault() ?? new Profile { Name = "Default" };
+                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(activeProfile));
+            }
+        }
+
+        public void CloneProfile(string source, string dest)
+        {
+            if (!profiles.TryGetValue(source, out var p))
+                return;
+            var clone = new Profile
+            {
+                Name = dest,
+                KeyBindings = new Dictionary<string, string>(p.KeyBindings)
+            };
+            profiles[dest] = clone;
+            SaveProfile(clone);
         }
     }
 }
