@@ -1,5 +1,8 @@
 name: "CodeQL"
 
+# This repository contains only C# source code.
+# Configure CodeQL to analyze the C# language exclusively.
+
 on:
   push:
     branches: [ main, work ]
