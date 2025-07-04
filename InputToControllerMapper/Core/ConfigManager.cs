@@ -2,6 +2,9 @@ using System.Text.Json;
 
 namespace InputToControllerMapper.Core
 {
+    /// <summary>
+    /// Helper utilities for loading and saving JSON configuration files.
+    /// </summary>
     public static class ConfigManager
     {
         public static T? Load<T>(string path)

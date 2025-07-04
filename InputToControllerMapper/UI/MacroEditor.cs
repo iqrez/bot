@@ -4,6 +4,9 @@ using System.Windows.Forms;
 
 namespace InputToControllerMapper.UI
 {
+    /// <summary>
+    /// Minimal window used to edit serialized macro actions.
+    /// </summary>
     public class MacroEditor : Form
     {
         private readonly TextBox text;

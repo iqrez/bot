@@ -47,7 +47,7 @@ public class TrayIconTests
     }
 
     [Fact]
-    public void ContextMenuProfileSwitchChangesActiveProfile()
+    public void ContextMenuProfileSwitchChangesProfile()
     {
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(path);
@@ -67,7 +67,7 @@ public class TrayIconTests
             .First(i => i.Text == "B");
         itemB.PerformClick();
 
-        Assert.Equal("B", manager.ActiveProfile.Name);
+        Assert.Equal("B", manager.CurrentProfile.Name);
         var listField = typeof(MainWindow).GetField("profileList", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var list = (ListBox)listField.GetValue(form)!;
         Assert.Equal("B", list.SelectedItem);

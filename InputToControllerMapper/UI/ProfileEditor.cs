@@ -6,6 +6,9 @@ using Core;
 
 namespace InputToControllerMapper.UI
 {
+    /// <summary>
+    /// Simple UI for creating, cloning and deleting profiles.
+    /// </summary>
     public class ProfileEditor : Form
     {
         private readonly ProfileManager manager;

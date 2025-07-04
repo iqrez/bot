@@ -6,6 +6,9 @@ using Core;
 
 namespace InputToControllerMapper.UI
 {
+    /// <summary>
+    /// Main application window that displays the current profile and mappings.
+    /// </summary>
     public class MainWindow : Form
     {
         private readonly ProfileManager profileManager;
@@ -79,23 +82,23 @@ namespace InputToControllerMapper.UI
             foreach (var p in profileManager.Profiles)
                 profileList.Items.Add(p.Name);
 
-            if (profileManager.ActiveProfile != null)
-                profileList.SelectedItem = profileManager.ActiveProfile.Name;
-            LoadActiveProfile();
+            if (profileManager.CurrentProfile != null)
+                profileList.SelectedItem = profileManager.CurrentProfile.Name;
+            LoadCurrentProfile();
         }
 
         private void LoadSelectedProfile()
         {
             if (profileList.SelectedItem is string name)
             {
-                profileManager.SetActiveProfile(name);
-                LoadActiveProfile();
+                profileManager.SetCurrentProfile(name);
+                LoadCurrentProfile();
             }
         }
 
-        private void LoadActiveProfile()
+        private void LoadCurrentProfile()
         {
-            var p = profileManager.ActiveProfile;
+            var p = profileManager.CurrentProfile;
             mappingGrid.Rows.Clear();
             if (p != null)
             {

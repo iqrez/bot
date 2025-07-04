@@ -5,12 +5,16 @@ using Core;
 
 namespace InputToControllerMapper
 {
+    /// <summary>
+    /// System tray integration for the application.
+    /// </summary>
     public class TrayIcon : IDisposable
     {
         private readonly NotifyIcon notifyIcon;
         private readonly Form mainForm;
         private readonly ProfileManager manager;
         private bool enabled = true;
+        private bool disposed;
 
         public bool Enabled => enabled;
 
@@ -73,6 +77,9 @@ namespace InputToControllerMapper
 
         public void Dispose()
         {
+            if (disposed)
+                return;
+            disposed = true;
             notifyIcon.Dispose();
         }
     }

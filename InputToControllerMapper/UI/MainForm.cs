@@ -5,6 +5,9 @@ using Core;
 
 namespace InputToControllerMapper
 {
+    /// <summary>
+    /// Simplified main form used in unit tests to host the tray icon.
+    /// </summary>
     public class MainForm : Form
     {
         private readonly SettingsManager settingsManager;
@@ -22,6 +25,7 @@ namespace InputToControllerMapper
         {
             settingsManager = settings ?? throw new ArgumentNullException(nameof(settings));
             profileManager = profiles ?? throw new ArgumentNullException(nameof(profiles));
+            settingsManager.Load();
 
             // Window setup
             Text = "Input To Controller Mapper";
@@ -87,8 +91,16 @@ namespace InputToControllerMapper
             tray = new TrayIcon(this, profileManager);
 
             // Cleanup tray on close/app exit
-            Application.ApplicationExit += (s, e) => tray.Dispose();
-            FormClosed += (s, e) => tray.Dispose();
+            Application.ApplicationExit += (s, e) =>
+            {
+                tray.Dispose();
+                settingsManager.Save();
+            };
+            FormClosed += (s, e) =>
+            {
+                tray.Dispose();
+                settingsManager.Save();
+            };
 
             // Hide to tray on user close
             FormClosing += OnFormClosing;

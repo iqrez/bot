@@ -59,6 +59,9 @@ namespace Core
         public List<ControllerAction> Actions { get; set; } = new();
     }
 
+    /// <summary>
+    /// Collection of input mappings stored on disk and applied at runtime.
+    /// </summary>
     public class Profile
     {
         public string Name { get; set; } = "Default";
