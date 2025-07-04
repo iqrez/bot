@@ -44,6 +44,7 @@ namespace InputToControllerMapper
 
         private readonly Thread pollThread;
         private volatile bool running;
+        private bool disposed;
 
         public WootingAnalogHandler()
         {
@@ -70,11 +71,10 @@ namespace InputToControllerMapper
 
         private void PollLoop()
         {
-            int delay = 1000 / PollRateHz;
-            if (delay <= 0) delay = 1;
-
             while (running)
             {
+                int delay = 1000 / PollRateHz;
+                if (delay <= 0) delay = 1;
                 for (int key = 0; key < KeyCount; key++)
                 {
                     float val;
@@ -124,6 +124,10 @@ namespace InputToControllerMapper
 
         public void Dispose()
         {
+            if (disposed)
+                return;
+            disposed = true;
+
             running = false;
             if (pollThread.IsAlive)
             {
