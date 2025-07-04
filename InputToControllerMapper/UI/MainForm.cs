@@ -47,6 +47,8 @@ namespace InputToControllerMapper
 
             FormClosing += OnFormClosing;
             tray = new TrayIcon(this);
+            Application.ApplicationExit += (s, e) => tray.Dispose();
+            FormClosed += (s, e) => tray.Dispose();
 
             ApplyTheme();
         }
