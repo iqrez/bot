@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using System.IO;
 
 namespace InputToControllerMapper
 {
@@ -12,7 +13,11 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            MainForm mainForm = new MainForm();
+            string appPath = Application.UserAppDataPath;
+            Directory.CreateDirectory(appPath);
+            var settingsManager = new SettingsManager(Path.Combine(appPath, "settings.json"));
+
+            MainForm mainForm = new MainForm(settingsManager);
             Application.Run(mainForm);
         }
     }
