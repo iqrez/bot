@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Forms;
 using System.IO;
+using Core;
 
 namespace InputToControllerMapper
 {
@@ -13,11 +14,19 @@ namespace InputToControllerMapper
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            // App data location
             string appPath = Application.UserAppDataPath;
             Directory.CreateDirectory(appPath);
-            var profileManager = new ProfileManager(Path.Combine(appPath, "profiles"));
 
-            using MainWindow mainForm = new MainWindow(profileManager);
+            // Profiles directory inside app data
+            string profilesDir = Path.Combine(appPath, "profiles");
+            Directory.CreateDirectory(profilesDir);
+
+            // ProfileManager expects a folder, not a file
+            var profileManager = new ProfileManager(profilesDir);
+
+            // Use MainWindow as your main form
+            using var mainForm = new UI.MainWindow(profileManager);
             Application.Run(mainForm);
         }
     }

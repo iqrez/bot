@@ -138,6 +138,4 @@ namespace InputToControllerMapper
         }
     }
 
-    /// <summary>Possible key code modes for the SDK.</summary>
-    public enum KeyCodeMode { HID = 0, ScanCode1 = 1, VirtualKey = 2 }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using InputToControllerMapper;
+using Core;
 
 namespace InputToControllerMapper.UI
 {
@@ -15,7 +16,7 @@ namespace InputToControllerMapper.UI
 
         public MainWindow(ProfileManager manager)
         {
-            profileManager = manager;
+            profileManager = manager ?? throw new ArgumentNullException(nameof(manager));
 
             Text = "Input To Controller Mapper";
             Size = new Size(900, 600);
@@ -47,8 +48,11 @@ namespace InputToControllerMapper.UI
 
             tray = new TrayIcon(this, profileManager);
 
+            // Proper tray disposal on exit and close
             Application.ApplicationExit += (s, e) => tray.Dispose();
             FormClosed += (s, e) => tray.Dispose();
+
+            // Refresh UI when profile changes
             profileManager.ProfileChanged += (s, e) =>
             {
                 if (InvokeRequired)
@@ -72,9 +76,11 @@ namespace InputToControllerMapper.UI
         private void RefreshProfileList()
         {
             profileList.Items.Clear();
-            foreach (var p in profileManager.All)
+            foreach (var p in profileManager.Profiles)
                 profileList.Items.Add(p.Name);
-            profileList.SelectedItem = profileManager.ActiveProfile.Name;
+
+            if (profileManager.ActiveProfile != null)
+                profileList.SelectedItem = profileManager.ActiveProfile.Name;
             LoadActiveProfile();
         }
 
@@ -91,8 +97,11 @@ namespace InputToControllerMapper.UI
         {
             var p = profileManager.ActiveProfile;
             mappingGrid.Rows.Clear();
-            foreach (var kv in p.KeyBindings)
-                mappingGrid.Rows.Add(kv.Key, kv.Value);
+            if (p != null)
+            {
+                foreach (var kv in p.KeyBindings)
+                    mappingGrid.Rows.Add(kv.Key, kv.Value);
+            }
         }
 
         protected override void OnShown(EventArgs e)

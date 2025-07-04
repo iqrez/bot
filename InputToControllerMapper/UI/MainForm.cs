@@ -1,43 +1,81 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Core;
 
 namespace InputToControllerMapper
 {
     public class MainForm : Form
     {
         private readonly SettingsManager settingsManager;
+        private readonly ProfileManager profileManager;
 
-        private ListBox profileList;
-        private DataGridView mappingGrid;
-        private GroupBox inputGroup;
-        private GroupBox outputGroup;
-        private TrayIcon tray;
-        private Button settingsButton;
+        private readonly ListBox profileList;
+        private readonly DataGridView mappingGrid;
+        private readonly GroupBox inputGroup;
+        private readonly GroupBox outputGroup;
+        private readonly Button settingsButton;
 
-        public MainForm(SettingsManager settings)
+        private readonly TrayIcon tray;
+
+        public MainForm(SettingsManager settings, ProfileManager profiles)
         {
-            settingsManager = settings;
+            settingsManager = settings ?? throw new ArgumentNullException(nameof(settings));
+            profileManager = profiles ?? throw new ArgumentNullException(nameof(profiles));
 
+            // Window setup
             Text = "Input To Controller Mapper";
             Size = new Size(800, 600);
+            MinimumSize = new Size(650, 400);
 
-            profileList = new ListBox { Dock = DockStyle.Left, Width = 150 };
+            // Profile List
+            profileList = new ListBox
+            {
+                Dock = DockStyle.Left,
+                Width = 160
+            };
             Controls.Add(profileList);
 
-            mappingGrid = new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false };
+            // Mapping grid
+            mappingGrid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = false,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            };
             mappingGrid.Columns.Add("Input", "Input");
             mappingGrid.Columns.Add("Output", "Controller Output");
             Controls.Add(mappingGrid);
 
-            inputGroup = new GroupBox { Text = "Input State", Dock = DockStyle.Bottom, Height = 80 };
-            outputGroup = new GroupBox { Text = "Output State", Dock = DockStyle.Bottom, Height = 80 };
+            // Input/Output Group Boxes
+            inputGroup = new GroupBox
+            {
+                Text = "Input State",
+                Dock = DockStyle.Bottom,
+                Height = 70
+            };
+            outputGroup = new GroupBox
+            {
+                Text = "Output State",
+                Dock = DockStyle.Bottom,
+                Height = 70
+            };
             Controls.Add(outputGroup);
             Controls.Add(inputGroup);
 
-            settingsButton = new Button { Text = "Settings", Dock = DockStyle.Top, Height = 30 };
-            settingsButton.Click += (s, e) => {
-                using SettingsForm sf = new SettingsForm(settingsManager);
+            // Settings Button
+            settingsButton = new Button
+            {
+                Text = "Settings",
+                Dock = DockStyle.Top,
+                Height = 34
+            };
+            settingsButton.Click += (s, e) =>
+            {
+                using var sf = new SettingsForm(settingsManager);
                 if (sf.ShowDialog() == DialogResult.OK)
                 {
                     ApplyTheme();
@@ -45,11 +83,17 @@ namespace InputToControllerMapper
             };
             Controls.Add(settingsButton);
 
-            FormClosing += OnFormClosing;
-            tray = new TrayIcon(this);
+            // Tray Icon setup (with profileManager)
+            tray = new TrayIcon(this, profileManager);
+
+            // Cleanup tray on close/app exit
             Application.ApplicationExit += (s, e) => tray.Dispose();
             FormClosed += (s, e) => tray.Dispose();
 
+            // Hide to tray on user close
+            FormClosing += OnFormClosing;
+
+            // Initial theming
             ApplyTheme();
         }
 
@@ -75,15 +119,21 @@ namespace InputToControllerMapper
 
         private void ApplyTheme()
         {
-            if (settingsManager.Current.Theme == "Dark")
+            if (settingsManager.Current?.Theme == "Dark")
             {
                 BackColor = Color.FromArgb(45, 45, 48);
                 ForeColor = Color.White;
+                mappingGrid.BackgroundColor = BackColor;
+                mappingGrid.DefaultCellStyle.BackColor = BackColor;
+                mappingGrid.DefaultCellStyle.ForeColor = ForeColor;
             }
             else
             {
                 BackColor = SystemColors.Control;
                 ForeColor = SystemColors.ControlText;
+                mappingGrid.BackgroundColor = BackColor;
+                mappingGrid.DefaultCellStyle.BackColor = BackColor;
+                mappingGrid.DefaultCellStyle.ForeColor = ForeColor;
             }
         }
     }
