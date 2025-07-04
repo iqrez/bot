@@ -21,8 +21,8 @@ namespace InputToControllerMapper
         public float Smoothing { get; set; } = 0f;
         public bool InvertY { get; set; }
         public StickCurveShape Curve { get; set; } = StickCurveShape.Linear;
-        public float Exponent { get; set; } = 1.5f;          // used for Exponential and DualZone curves
-        public float OuterExponent { get; set; } = 1.0f;      // used for DualZone curves
+        public float Exponent { get; set; } = 1.5f;          // for Exponential and DualZone curves
+        public float OuterExponent { get; set; } = 1.0f;      // for DualZone
         public float DualZoneThreshold { get; set; } = 0.5f;  // 0..1
 
         private float smoothX;

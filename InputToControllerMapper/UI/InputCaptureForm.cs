@@ -76,7 +76,6 @@ namespace InputToControllerMapper
                     controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
                     controller.SubmitReport();
                 });
-                // Also support event handler style, if implemented
                 wootingHandler.AnalogValueChanged += (_, value) =>
                 {
                     byte val = (byte)(Math.Clamp(value, 0f, 1f) * 255);
