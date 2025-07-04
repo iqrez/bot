@@ -27,8 +27,8 @@ namespace InputToControllerMapper
         public string Name { get; set; } = "Default";
         public ControllerType ControllerType { get; set; } = ControllerType.Xbox360;
         [JsonPropertyName("KeyBindings")]
-        public Dictionary<string, string> Bindings { get; set; } = new();
-        public Dictionary<string, AnalogConfig> Analog { get; set; } = new();
+        public Dictionary<string, string> Mappings { get; set; } = new();
+        public Dictionary<string, AnalogConfig> AnalogSettings { get; set; } = new();
         public Dictionary<string, Macro> Macros { get; set; } = new();
 
         public static Profile Load(string path)
