@@ -1,48 +1,59 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 
 namespace InputToControllerMapper
 {
+    public enum ControllerType
+    {
+        Xbox360,
+        DS4
+    }
+
+    public class AnalogConfig
+    {
+        public float Deadzone { get; set; }
+        public float Sensitivity { get; set; } = 1f;
+        public CurveType Curve { get; set; } = CurveType.Linear;
+    }
+
     public class Profile
     {
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 1;
 
         public int Version { get; set; } = CurrentVersion;
-        public string Name { get; set; }
-        public Dictionary<string, string> KeyBindings { get; set; } = new Dictionary<string, string>();
+        public string Name { get; set; } = "Default";
+        public ControllerType ControllerType { get; set; } = ControllerType.Xbox360;
+        public Dictionary<string, string> Bindings { get; set; } = new();
+        public Dictionary<string, AnalogConfig> Analog { get; set; } = new();
+        public Dictionary<string, Macro> Macros { get; set; } = new();
+
+        public static Profile Load(string path)
+        {
+            string json = File.ReadAllText(path);
+            return FromJson(json);
+        }
 
         public static Profile FromJson(string json)
         {
-            using JsonDocument doc = JsonDocument.Parse(json);
-            return FromJsonElement(doc.RootElement);
+            var options = new JsonSerializerOptions
+            {
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+            return JsonSerializer.Deserialize<Profile>(json, options) ?? new Profile();
         }
 
-        public static Profile FromJsonElement(JsonElement element)
+        public void Save(string path)
         {
-            int version = element.TryGetProperty("Version", out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 1;
-            string name = element.TryGetProperty("Name", out var n) ? n.GetString() : "Default";
+            File.WriteAllText(path, ToJson());
+        }
 
-            var profile = new Profile { Name = name };
-
-            if (version == 1)
-            {
-                if (element.TryGetProperty("Bindings", out var b) && b.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var prop in b.EnumerateObject())
-                        profile.KeyBindings[prop.Name] = prop.Value.GetString();
-                }
-            }
-            else
-            {
-                if (element.TryGetProperty("KeyBindings", out var b) && b.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var prop in b.EnumerateObject())
-                        profile.KeyBindings[prop.Name] = prop.Value.GetString();
-                }
-            }
-
-            profile.Version = CurrentVersion;
-            return profile;
+        public string ToJson()
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            return JsonSerializer.Serialize(this, options);
         }
     }
 }
