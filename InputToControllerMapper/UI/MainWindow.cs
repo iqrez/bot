@@ -47,6 +47,16 @@ namespace InputToControllerMapper.UI
 
             tray = new TrayIcon(this, profileManager);
 
+            Application.ApplicationExit += (s, e) => tray.Dispose();
+            FormClosed += (s, e) => tray.Dispose();
+            profileManager.ProfileChanged += (s, e) =>
+            {
+                if (InvokeRequired)
+                    BeginInvoke(new Action(RefreshProfileList));
+                else
+                    RefreshProfileList();
+            };
+
             RefreshProfileList();
         }
 
@@ -65,6 +75,7 @@ namespace InputToControllerMapper.UI
             foreach (var p in profileManager.All)
                 profileList.Items.Add(p.Name);
             profileList.SelectedItem = profileManager.ActiveProfile.Name;
+            LoadActiveProfile();
         }
 
         private void LoadSelectedProfile()
@@ -72,7 +83,16 @@ namespace InputToControllerMapper.UI
             if (profileList.SelectedItem is string name)
             {
                 profileManager.SetActiveProfile(name);
+                LoadActiveProfile();
             }
+        }
+
+        private void LoadActiveProfile()
+        {
+            var p = profileManager.ActiveProfile;
+            mappingGrid.Rows.Clear();
+            foreach (var kv in p.KeyBindings)
+                mappingGrid.Rows.Add(kv.Key, kv.Value);
         }
 
         protected override void OnShown(EventArgs e)

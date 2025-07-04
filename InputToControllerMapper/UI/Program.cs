@@ -15,9 +15,9 @@ namespace InputToControllerMapper
 
             string appPath = Application.UserAppDataPath;
             Directory.CreateDirectory(appPath);
-            var settingsManager = new SettingsManager(Path.Combine(appPath, "settings.json"));
+            var profileManager = new ProfileManager(Path.Combine(appPath, "profiles"));
 
-            MainForm mainForm = new MainForm(settingsManager);
+            using MainWindow mainForm = new MainWindow(profileManager);
             Application.Run(mainForm);
         }
     }
