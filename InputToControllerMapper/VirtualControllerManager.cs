@@ -1,136 +1,47 @@
+#nullable enable
 using System;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
-using Nefarius.ViGEm.Client.Targets.DualShock4;
+using Core;
 
 namespace InputToControllerMapper
 {
-    public enum VirtualControllerType
-    {
-        Xbox360,
-        DualShock4
-    }
-
     /// <summary>
-    /// Simple wrapper that manages either a virtual Xbox 360 or DualShock 4 controller.
+    /// Manages a virtual Xbox 360 controller via ViGEm.
     /// </summary>
-    public class VirtualControllerManager : IDisposable
+    public class VirtualControllerManager : IDisposable, IVirtualController
     {
         private readonly ViGEmClient client;
-        private IXbox360Controller? xbox;
-        private IDualShock4Controller? ds4;
-        private VirtualControllerType type;
+        private readonly IXbox360Controller controller;
 
-        public VirtualControllerManager(VirtualControllerType controllerType = VirtualControllerType.Xbox360)
+        public VirtualControllerManager()
         {
             client = new ViGEmClient();
-            ChangeControllerType(controllerType);
+            controller = client.CreateXbox360Controller();
+            controller.FeedbackReceived += OnFeedback;
+            controller.Connect();
         }
 
-        public VirtualControllerType ControllerType => type;
+        public void SetButton(Xbox360Button button, bool pressed) => controller.SetButtonState(button, pressed);
 
-        private void DisconnectCurrent()
-        {
-            if (xbox != null)
-            {
-                xbox.FeedbackReceived -= OnXboxFeedback;
-                xbox.Disconnect();
-                xbox = null;
-            }
+        public void SetAxis(Xbox360Axis axis, short value) => controller.SetAxisValue(axis, value);
 
-            if (ds4 != null)
-            {
-                ds4.FeedbackReceived -= OnDs4Feedback;
-                ds4.Disconnect();
-                ds4 = null;
-            }
-        }
+        public void SetTrigger(Xbox360Slider trigger, byte value) => controller.SetSliderValue(trigger, value);
 
-        /// <summary>
-        /// Changes the current virtual controller type.  The previous controller
-        /// will be disconnected and a new one created.
-        /// </summary>
-        public void ChangeControllerType(VirtualControllerType newType)
-        {
-            if (type == newType)
-                return;
+        public void SetDPad(Xbox360Button direction, bool pressed) => controller.SetButtonState(direction, pressed);
 
-            DisconnectCurrent();
-            type = newType;
+        public void Submit() => controller.SubmitReport();
 
-            switch (newType)
-            {
-                case VirtualControllerType.Xbox360:
-                    xbox = client.CreateXbox360Controller();
-                    xbox.FeedbackReceived += OnXboxFeedback;
-                    xbox.Connect();
-                    break;
-                case VirtualControllerType.DualShock4:
-                    ds4 = client.CreateDualShock4Controller();
-                    ds4.FeedbackReceived += OnDs4Feedback;
-                    ds4.Connect();
-                    break;
-            }
-        }
-
-        public void SetButton(Xbox360Button xbButton, bool pressed)
-        {
-            xbox?.SetButtonState(xbButton, pressed);
-        }
-        public void SetButton(DualShock4Button dsButton, bool pressed)
-        {
-            ds4?.SetButtonState(dsButton, pressed);
-        }
-
-        public void SetAxis(Xbox360Axis xbAxis, short value)
-        {
-            xbox?.SetAxisValue(xbAxis, value);
-        }
-        public void SetAxis(DualShock4Axis dsAxis, byte value)
-        {
-            ds4?.SetAxisValue(dsAxis, value);
-        }
-
-        public void SetTrigger(Xbox360Slider xbSlider, byte value)
-        {
-            xbox?.SetSliderValue(xbSlider, value);
-        }
-        public void SetTrigger(DualShock4Slider dsSlider, byte value)
-        {
-            ds4?.SetSliderValue(dsSlider, value);
-        }
-
-        public void SetDPad(Xbox360Button xbButton, bool pressed)
-        {
-            xbox?.SetButtonState(xbButton, pressed);
-        }
-        public void SetDPad(DualShock4DPadDirection dsDPad, bool pressed)
-        {
-            ds4?.SetDPadDirection(dsDPad);
-        }
-
-        /// <summary>
-        /// Sends the prepared report to the driver.
-        /// </summary>
-        public void SubmitReport()
-        {
-            xbox?.SubmitReport();
-            ds4?.SubmitReport();
-        }
-
-        private void OnXboxFeedback(object? sender, Xbox360FeedbackReceivedEventArgs e)
-        {
-            // Optional: handle rumble or LED feedback here.
-        }
-
-        private void OnDs4Feedback(object? sender, DualShock4FeedbackReceivedEventArgs e)
+        private void OnFeedback(object? sender, Xbox360FeedbackReceivedEventArgs e)
         {
             // Optional: handle rumble or LED feedback here.
         }
 
         public void Dispose()
         {
-            DisconnectCurrent();
+            controller.FeedbackReceived -= OnFeedback;
+            controller.Disconnect();
+            controller.Dispose();
             client.Dispose();
         }
     }

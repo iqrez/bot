@@ -1,8 +1,8 @@
+#nullable enable
 using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using InputToControllerMapper;
 using Core;
 
 namespace InputToControllerMapper.UI
@@ -16,7 +16,6 @@ namespace InputToControllerMapper.UI
         private readonly ListBox profileList;
         private readonly DataGridView mappingGrid;
         private readonly TextBox inputStateBox;
-        private readonly TrayIcon tray;
 
         public MainWindow(ProfileManager manager)
         {
@@ -24,7 +23,6 @@ namespace InputToControllerMapper.UI
 
             Text = "Input To Controller Mapper";
             Size = new Size(900, 600);
-            FormClosing += OnFormClosing;
 
             profileList = new ListBox { Dock = DockStyle.Left, Width = 150 };
             Controls.Add(profileList);
@@ -50,11 +48,6 @@ namespace InputToControllerMapper.UI
             inputStateBox = new TextBox { Dock = DockStyle.Bottom, ReadOnly = true };
             Controls.Add(inputStateBox);
 
-            tray = new TrayIcon(this, profileManager);
-
-            // Proper tray disposal on exit and close
-            Application.ApplicationExit += (s, e) => tray.Dispose();
-            FormClosed += (s, e) => tray.Dispose();
 
             // Refresh UI when profile changes
             profileManager.ProfileChanged += (s, e) =>
@@ -68,14 +61,6 @@ namespace InputToControllerMapper.UI
             RefreshProfileList();
         }
 
-        private void OnFormClosing(object? sender, FormClosingEventArgs e)
-        {
-            if (e.CloseReason == CloseReason.UserClosing)
-            {
-                e.Cancel = true;
-                Hide();
-            }
-        }
 
         private void RefreshProfileList()
         {

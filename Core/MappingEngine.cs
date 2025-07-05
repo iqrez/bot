@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
-using Nefarius.ViGEm.Client.Targets.DualShock4;
 
 namespace Core
 {
@@ -18,6 +17,39 @@ namespace Core
         private readonly Dictionary<string, float> axisStates = new();
         private readonly Dictionary<string, float> triggerStates = new();
         private readonly Dictionary<string, bool> dpadStates = new();
+
+        private static readonly Dictionary<string, Xbox360Button> XboxButtons = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Up"] = Xbox360Button.Up,
+            ["Down"] = Xbox360Button.Down,
+            ["Left"] = Xbox360Button.Left,
+            ["Right"] = Xbox360Button.Right,
+            ["Start"] = Xbox360Button.Start,
+            ["Back"] = Xbox360Button.Back,
+            ["LeftThumb"] = Xbox360Button.LeftThumb,
+            ["RightThumb"] = Xbox360Button.RightThumb,
+            ["LeftShoulder"] = Xbox360Button.LeftShoulder,
+            ["RightShoulder"] = Xbox360Button.RightShoulder,
+            ["Guide"] = Xbox360Button.Guide,
+            ["A"] = Xbox360Button.A,
+            ["B"] = Xbox360Button.B,
+            ["X"] = Xbox360Button.X,
+            ["Y"] = Xbox360Button.Y
+        };
+
+        private static readonly Dictionary<string, Xbox360Axis> XboxAxes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftThumbX"] = Xbox360Axis.LeftThumbX,
+            ["LeftThumbY"] = Xbox360Axis.LeftThumbY,
+            ["RightThumbX"] = Xbox360Axis.RightThumbX,
+            ["RightThumbY"] = Xbox360Axis.RightThumbY
+        };
+
+        private static readonly Dictionary<string, Xbox360Slider> XboxTriggers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftTrigger"] = Xbox360Slider.LeftTrigger,
+            ["RightTrigger"] = Xbox360Slider.RightTrigger
+        };
 
         private int mouseDeltaX;
         private int mouseDeltaY;
@@ -110,33 +142,20 @@ namespace Core
             ApplyMouseMappings();
 
             foreach (var kv in buttonStates)
-            {
-                if (Enum.TryParse<Xbox360Button>(kv.Key, out var xbButton))
-                    ctrl.SetButton(xbButton, kv.Value);
-                else if (Enum.TryParse<DualShock4Button>(kv.Key, out var dsButton))
-                    ctrl.SetButton(dsButton, kv.Value);
-            }
+                if (XboxButtons.TryGetValue(kv.Key, out var btn))
+                    ctrl.SetButton(btn, kv.Value);
+
             foreach (var kv in axisStates)
-            {
-                if (Enum.TryParse<Xbox360Axis>(kv.Key, out var xbAxis))
-                    ctrl.SetAxis(xbAxis, (short)(kv.Value * short.MaxValue));
-                else if (Enum.TryParse<DualShock4Axis>(kv.Key, out var dsAxis))
-                    ctrl.SetAxis(dsAxis, (byte)(Math.Clamp(kv.Value, 0f, 1f) * byte.MaxValue));
-            }
+                if (XboxAxes.TryGetValue(kv.Key, out var axis))
+                    ctrl.SetAxis(axis, (short)(kv.Value * short.MaxValue));
+
             foreach (var kv in triggerStates)
-            {
-                if (Enum.TryParse<Xbox360Slider>(kv.Key, out var xbSlider))
-                    ctrl.SetTrigger(xbSlider, (byte)(kv.Value * byte.MaxValue));
-                else if (Enum.TryParse<DualShock4Slider>(kv.Key, out var dsSlider))
-                    ctrl.SetTrigger(dsSlider, (byte)(kv.Value * byte.MaxValue));
-            }
+                if (XboxTriggers.TryGetValue(kv.Key, out var trig))
+                    ctrl.SetTrigger(trig, (byte)(kv.Value * byte.MaxValue));
+
             foreach (var kv in dpadStates)
-            {
-                if (Enum.TryParse<Xbox360Button>(kv.Key, out var xbButton))
-                    ctrl.SetDPad(xbButton, kv.Value);
-                else if (Enum.TryParse<DualShock4DPadDirection>(kv.Key, out var dsDPad))
-                    ctrl.SetDPad(dsDPad, kv.Value);
-            }
+                if (XboxButtons.TryGetValue(kv.Key, out var dir))
+                    ctrl.SetDPad(dir, kv.Value);
 
             ctrl.Submit();
         }
