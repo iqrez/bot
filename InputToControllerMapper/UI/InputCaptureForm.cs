@@ -56,11 +56,11 @@ namespace InputToControllerMapper
 
             try
             {
-                rawInput = new RawInputHandler();
-                rawInput.RegisterDevice(this.Handle);
-                rawInput.KeyPressed += OnKey;
-                rawInput.MouseMoved += OnMouse;
-                rawInput.MouseButtonPressed += OnButton;
+                rawInput = RawInputHandler.Instance;
+                rawInput.RegisterDevices(this.Handle);
+                rawInput.KeyDown += OnKey;
+                rawInput.MouseMove += OnMouseMove;
+                rawInput.MouseButtonDown += OnMouseButton;
                 rawPanel.BackColor = Color.Green;
                 Log("Raw input ready");
             }
@@ -72,16 +72,10 @@ namespace InputToControllerMapper
 
             try
             {
-                // Support both delegate (constructor) and event handler usage
-                wootingHandler = new WootingAnalogHandler(v =>
+                wootingHandler = new WootingAnalogHandler();
+                wootingHandler.AnalogValueUpdated += (_, e) =>
                 {
-                    byte val = (byte)(Math.Clamp(v, 0f, 1f) * 255);
-                    controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
-                    controller.SubmitReport();
-                });
-                wootingHandler.AnalogValueChanged += (_, value) =>
-                {
-                    byte val = (byte)(Math.Clamp(value, 0f, 1f) * 255);
+                    byte val = (byte)(Math.Clamp(e.Value, 0f, 1f) * 255);
                     controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
                     controller.SubmitReport();
                 };
@@ -105,7 +99,7 @@ namespace InputToControllerMapper
         private void OnKey(object sender, RawKeyEventArgs e)
         {
             bool down = e.IsKeyDown;
-            switch (e.KeyCode)
+            switch (e.VirtualKey)
             {
                 case Keys.W:
                     controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)(down ? short.MaxValue : 0));
@@ -124,21 +118,21 @@ namespace InputToControllerMapper
                     break;
             }
             controller.SubmitReport();
-            Log("Key " + e.KeyCode + (down ? " down" : " up"));
+            Log("Key " + e.VirtualKey + (down ? " down" : " up"));
         }
 
-        private void OnMouse(object sender, RawMouseEventArgs e)
+        private void OnMouseMove(object sender, RawMouseMoveEventArgs e)
         {
             controller.SetAxisValue(Xbox360Axis.RightThumbX, (short)e.DeltaX);
             controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)e.DeltaY);
             controller.SubmitReport();
         }
 
-        private void OnButton(object sender, RawMouseButtonEventArgs e)
+        private void OnMouseButton(object sender, RawMouseButtonEventArgs e)
         {
-            if (e.IsLeftButton)
+            if (e.Button == RawMouseButton.Left)
                 controller.SetSliderValue(Xbox360Slider.RightTrigger, (byte)(e.IsButtonDown ? 255 : 0));
-            if (e.IsRightButton)
+            if (e.Button == RawMouseButton.Right)
                 controller.SetSliderValue(Xbox360Slider.LeftTrigger, (byte)(e.IsButtonDown ? 255 : 0));
             controller.SubmitReport();
         }
