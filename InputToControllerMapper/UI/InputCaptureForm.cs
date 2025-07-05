@@ -80,7 +80,7 @@ namespace InputToControllerMapper
                 {
                     byte val = (byte)(Math.Clamp(e.Value, 0f, 1f) * 255);
                     controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
-                    controller.SubmitReport();
+                    controller.Submit();
                 };
                 wootingPanel.BackColor = Color.Green;
                 Log("Wooting ready");
@@ -120,7 +120,7 @@ namespace InputToControllerMapper
                     controller.SetButtonState(Xbox360Button.A, down);
                     break;
             }
-            controller.SubmitReport();
+            controller.Submit();
             Log("Key " + e.VirtualKey + (down ? " down" : " up"));
         }
 
@@ -128,7 +128,7 @@ namespace InputToControllerMapper
         {
             controller.SetAxisValue(Xbox360Axis.RightThumbX, (short)e.DeltaX);
             controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)e.DeltaY);
-            controller.SubmitReport();
+            controller.Submit();
         }
 
         private void OnMouseButton(object sender, RawMouseButtonEventArgs e)
@@ -137,7 +137,7 @@ namespace InputToControllerMapper
                 controller.SetSliderValue(Xbox360Slider.RightTrigger, (byte)(e.IsButtonDown ? 255 : 0));
             if (e.Button == RawMouseButton.Right)
                 controller.SetSliderValue(Xbox360Slider.LeftTrigger, (byte)(e.IsButtonDown ? 255 : 0));
-            controller.SubmitReport();
+            controller.Submit();
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

@@ -104,7 +104,7 @@ namespace InputToControllerMapper
                 }
                 SetControllerState(action, val);
             }
-            controller.SubmitReport();
+            controller.Submit();
         }
 
         private static float ApplyAnalogOptions(float value, AnalogOptions opts)
