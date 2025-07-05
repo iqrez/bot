@@ -19,6 +19,71 @@ namespace Core
         private readonly Dictionary<string, float> triggerStates = new();
         private readonly Dictionary<string, bool> dpadStates = new();
 
+        private static readonly Dictionary<string, Xbox360Button> XboxButtons = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Up"] = Xbox360Button.Up,
+            ["Down"] = Xbox360Button.Down,
+            ["Left"] = Xbox360Button.Left,
+            ["Right"] = Xbox360Button.Right,
+            ["Start"] = Xbox360Button.Start,
+            ["Back"] = Xbox360Button.Back,
+            ["LeftThumb"] = Xbox360Button.LeftThumb,
+            ["RightThumb"] = Xbox360Button.RightThumb,
+            ["LeftShoulder"] = Xbox360Button.LeftShoulder,
+            ["RightShoulder"] = Xbox360Button.RightShoulder,
+            ["Guide"] = Xbox360Button.Guide,
+            ["A"] = Xbox360Button.A,
+            ["B"] = Xbox360Button.B,
+            ["X"] = Xbox360Button.X,
+            ["Y"] = Xbox360Button.Y
+        };
+
+        private static readonly Dictionary<string, DualShock4Button> Ds4Buttons = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Cross"] = DualShock4Button.Cross,
+            ["Circle"] = DualShock4Button.Circle,
+            ["Square"] = DualShock4Button.Square,
+            ["Triangle"] = DualShock4Button.Triangle,
+            ["L1"] = DualShock4Button.ShoulderLeft,
+            ["R1"] = DualShock4Button.ShoulderRight,
+            ["L2"] = DualShock4Button.TriggerLeft,
+            ["R2"] = DualShock4Button.TriggerRight,
+            ["Share"] = DualShock4Button.Share,
+            ["Options"] = DualShock4Button.Options,
+            ["L3"] = DualShock4Button.ThumbLeft,
+            ["R3"] = DualShock4Button.ThumbRight,
+            ["PS"] = DualShock4Button.Ps,
+            ["Touchpad"] = DualShock4Button.Touchpad
+        };
+
+        private static readonly Dictionary<string, Xbox360Axis> XboxAxes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftThumbX"] = Xbox360Axis.LeftThumbX,
+            ["LeftThumbY"] = Xbox360Axis.LeftThumbY,
+            ["RightThumbX"] = Xbox360Axis.RightThumbX,
+            ["RightThumbY"] = Xbox360Axis.RightThumbY
+        };
+
+        private static readonly Dictionary<string, DualShock4Axis> Ds4Axes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftStickX"] = DualShock4Axis.LeftThumbX,
+            ["LeftStickY"] = DualShock4Axis.LeftThumbY,
+            ["RightStickX"] = DualShock4Axis.RightThumbX,
+            ["RightStickY"] = DualShock4Axis.RightThumbY
+        };
+
+        private static readonly Dictionary<string, Xbox360Slider> XboxTriggers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftTrigger"] = Xbox360Slider.LeftTrigger,
+            ["RightTrigger"] = Xbox360Slider.RightTrigger
+        };
+
+        private static readonly Dictionary<string, DualShock4Slider> Ds4Triggers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["L2"] = DualShock4Slider.LeftTrigger,
+            ["R2"] = DualShock4Slider.RightTrigger
+        };
+
         private int mouseDeltaX;
         private int mouseDeltaY;
 
@@ -109,33 +174,41 @@ namespace Core
         {
             ApplyMouseMappings();
 
-            foreach (var kv in buttonStates)
+            if (ctrl.ControllerType == VirtualControllerType.Xbox360)
             {
-                if (Enum.TryParse<Xbox360Button>(kv.Key, out var xbButton))
-                    ctrl.SetButton(xbButton, kv.Value);
-                else if (Enum.TryParse<DualShock4Button>(kv.Key, out var dsButton))
-                    ctrl.SetButton(dsButton, kv.Value);
+                foreach (var kv in buttonStates)
+                    if (XboxButtons.TryGetValue(kv.Key, out var btn))
+                        ctrl.SetButton(btn, kv.Value);
+
+                foreach (var kv in axisStates)
+                    if (XboxAxes.TryGetValue(kv.Key, out var axis))
+                        ctrl.SetAxis(axis, (short)(kv.Value * short.MaxValue));
+
+                foreach (var kv in triggerStates)
+                    if (XboxTriggers.TryGetValue(kv.Key, out var trig))
+                        ctrl.SetTrigger(trig, (byte)(kv.Value * byte.MaxValue));
+
+                foreach (var kv in dpadStates)
+                    if (XboxButtons.TryGetValue(kv.Key, out var dir))
+                        ctrl.SetDPad(dir, kv.Value);
             }
-            foreach (var kv in axisStates)
+            else
             {
-                if (Enum.TryParse<Xbox360Axis>(kv.Key, out var xbAxis))
-                    ctrl.SetAxis(xbAxis, (short)(kv.Value * short.MaxValue));
-                else if (Enum.TryParse<DualShock4Axis>(kv.Key, out var dsAxis))
-                    ctrl.SetAxis(dsAxis, (byte)(Math.Clamp(kv.Value, 0f, 1f) * byte.MaxValue));
-            }
-            foreach (var kv in triggerStates)
-            {
-                if (Enum.TryParse<Xbox360Slider>(kv.Key, out var xbSlider))
-                    ctrl.SetTrigger(xbSlider, (byte)(kv.Value * byte.MaxValue));
-                else if (Enum.TryParse<DualShock4Slider>(kv.Key, out var dsSlider))
-                    ctrl.SetTrigger(dsSlider, (byte)(kv.Value * byte.MaxValue));
-            }
-            foreach (var kv in dpadStates)
-            {
-                if (Enum.TryParse<Xbox360Button>(kv.Key, out var xbButton))
-                    ctrl.SetDPad(xbButton, kv.Value);
-                else if (Enum.TryParse<DualShock4DPadDirection>(kv.Key, out var dsDPad))
-                    ctrl.SetDPad(dsDPad, kv.Value);
+                foreach (var kv in buttonStates)
+                    if (Ds4Buttons.TryGetValue(kv.Key, out var btn))
+                        ctrl.SetButton(btn, kv.Value);
+
+                foreach (var kv in axisStates)
+                    if (Ds4Axes.TryGetValue(kv.Key, out var axis))
+                        ctrl.SetAxis(axis, (byte)(Math.Clamp(kv.Value, 0f, 1f) * byte.MaxValue));
+
+                foreach (var kv in triggerStates)
+                    if (Ds4Triggers.TryGetValue(kv.Key, out var trig))
+                        ctrl.SetTrigger(trig, (byte)(kv.Value * byte.MaxValue));
+
+                foreach (var kv in dpadStates)
+                    if (Enum.TryParse<DualShock4DPadDirection>(kv.Key, true, out var dir))
+                        ctrl.SetDPad(dir, kv.Value);
             }
 
             ctrl.Submit();

@@ -2,19 +2,14 @@ using System;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
 using Nefarius.ViGEm.Client.Targets.DualShock4;
+using Core;
 
 namespace InputToControllerMapper
 {
-    public enum VirtualControllerType
-    {
-        Xbox360,
-        DualShock4
-    }
-
     /// <summary>
     /// Simple wrapper that manages either a virtual Xbox 360 or DualShock 4 controller.
     /// </summary>
-    public class VirtualControllerManager : IDisposable
+    public class VirtualControllerManager : IDisposable, IVirtualController
     {
         private readonly ViGEmClient client;
         private IXbox360Controller? xbox;
@@ -106,13 +101,15 @@ namespace InputToControllerMapper
         }
         public void SetDPad(DualShock4DPadDirection dsDPad, bool pressed)
         {
-            ds4?.SetDPadDirection(dsDPad);
+            if (ds4 == null)
+                return;
+            ds4.SetDPadDirection(pressed ? dsDPad : DualShock4DPadDirection.None);
         }
 
         /// <summary>
         /// Sends the prepared report to the driver.
         /// </summary>
-        public void SubmitReport()
+        public void Submit()
         {
             xbox?.SubmitReport();
             ds4?.SubmitReport();
