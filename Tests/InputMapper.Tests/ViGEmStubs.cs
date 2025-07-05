@@ -1,3 +1,8 @@
+#nullable enable
+using Nefarius.ViGEm.Client;
+using Nefarius.ViGEm.Client.Targets;
+using Nefarius.ViGEm.Client.Targets.Xbox360;
+
 namespace Nefarius.ViGEm.Client.Targets.Xbox360
 {
     public enum Xbox360Button { A }

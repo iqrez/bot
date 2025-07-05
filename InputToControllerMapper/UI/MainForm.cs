@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -6,7 +7,7 @@ using Core;
 namespace InputToControllerMapper
 {
     /// <summary>
-    /// Simplified main form used in unit tests to host the tray icon.
+    /// Simplified main form used in unit tests.
     /// </summary>
     public class MainForm : Form
     {
@@ -19,7 +20,6 @@ namespace InputToControllerMapper
         private readonly GroupBox outputGroup;
         private readonly Button settingsButton;
 
-        private readonly TrayIcon tray;
 
         public MainForm(SettingsManager settings, ProfileManager profiles)
         {
@@ -87,37 +87,14 @@ namespace InputToControllerMapper
             };
             Controls.Add(settingsButton);
 
-            // Tray Icon setup (with profileManager)
-            tray = new TrayIcon(this, profileManager);
-
-            // Cleanup tray on close/app exit
-            Application.ApplicationExit += (s, e) =>
-            {
-                tray.Dispose();
-                settingsManager.Save();
-            };
-            FormClosed += (s, e) =>
-            {
-                tray.Dispose();
-                settingsManager.Save();
-            };
-
-            // Hide to tray on user close
-            FormClosing += OnFormClosing;
+            // Save settings on exit
+            Application.ApplicationExit += (s, e) => settingsManager.Save();
+            FormClosed += (s, e) => settingsManager.Save();
 
             // Initial theming
             ApplyTheme();
         }
 
-        private void OnFormClosing(object sender, FormClosingEventArgs e)
-        {
-            if (e.CloseReason == CloseReason.UserClosing)
-            {
-                e.Cancel = true;
-                Hide();
-                tray.ShowHideNotification();
-            }
-        }
 
         public void UpdateInputState(string text)
         {
