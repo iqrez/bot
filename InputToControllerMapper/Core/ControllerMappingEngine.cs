@@ -89,15 +89,22 @@ namespace InputToControllerMapper
             switch (action.Element)
             {
                 case ControllerElement.Button:
-                    controller.SetButtonState(Enum.Parse<Xbox360Button>(action.Target, true), value > 0.5f);
+                    if (Enum.TryParse(action.Target, true, out Xbox360Button xbButton))
+                        controller.SetButtonState(xbButton, value > 0.5f);
                     break;
                 case ControllerElement.Axis:
-                    short axisVal = (short)(value * short.MaxValue);
-                    controller.SetAxisValue(Enum.Parse<Xbox360Axis>(action.Target, true), axisVal);
+                    if (Enum.TryParse(action.Target, true, out Xbox360Axis xbAxis))
+                    {
+                        short axisVal = (short)(value * short.MaxValue);
+                        controller.SetAxisValue(xbAxis, axisVal);
+                    }
                     break;
                 case ControllerElement.Trigger:
-                    byte trigVal = (byte)(Math.Clamp(value, 0f, 1f) * byte.MaxValue);
-                    controller.SetSliderValue(Enum.Parse<Xbox360Slider>(action.Target, true), trigVal);
+                    if (Enum.TryParse(action.Target, true, out Xbox360Slider xbSlider))
+                    {
+                        byte trigVal = (byte)(Math.Clamp(value, 0f, 1f) * byte.MaxValue);
+                        controller.SetSliderValue(xbSlider, trigVal);
+                    }
                     break;
             }
         }

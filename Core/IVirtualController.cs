@@ -1,14 +1,19 @@
+using Nefarius.ViGEm.Client.Targets;
+using Nefarius.ViGEm.Client.Targets.Xbox360;
+using Nefarius.ViGEm.Client.Targets.DualShock4;
+
 namespace Core
 {
-    /// <summary>
-    /// Abstracts the controller implementation used by <see cref="MappingEngine"/>.
-    /// </summary>
     public interface IVirtualController
     {
-        void SetButtonState(string button, bool pressed);
-        void SetAxisValue(string axis, short value);
-        void SetTriggerValue(string trigger, byte value);
-        void SetDPadState(string direction, bool pressed);
+        void SetButton(Xbox360Button button, bool pressed);
+        void SetButton(DualShock4Button button, bool pressed);
+        void SetAxis(Xbox360Axis axis, short value);
+        void SetAxis(DualShock4Axis axis, byte value);
+        void SetTrigger(Xbox360Slider trigger, byte value);
+        void SetTrigger(DualShock4Slider trigger, byte value);
+        void SetDPad(Xbox360Button direction, bool pressed);
+        void SetDPad(DualShock4DPadDirection direction, bool pressed);
         void Submit();
     }
 }

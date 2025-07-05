@@ -73,36 +73,40 @@ namespace InputToControllerMapper
             }
         }
 
-        public void SetButton(Enum button, bool pressed)
+        public void SetButton(Xbox360Button xbButton, bool pressed)
         {
-            if (xbox != null && button is Xbox360Button xb)
-                xbox.SetButtonState(xb, pressed);
-            else if (ds4 != null && button is DualShock4Button db)
-                ds4.SetButtonState(db, pressed);
+            xbox?.SetButtonState(xbButton, pressed);
+        }
+        public void SetButton(DualShock4Button dsButton, bool pressed)
+        {
+            ds4?.SetButtonState(dsButton, pressed);
         }
 
-        public void SetAxis(Enum axis, short value)
+        public void SetAxis(Xbox360Axis xbAxis, short value)
         {
-            if (xbox != null && axis is Xbox360Axis xa)
-                xbox.SetAxisValue(xa, value);
-            else if (ds4 != null && axis is DualShock4Axis da)
-                ds4.SetAxisValue(da, value);
+            xbox?.SetAxisValue(xbAxis, value);
+        }
+        public void SetAxis(DualShock4Axis dsAxis, byte value)
+        {
+            ds4?.SetAxisValue(dsAxis, value);
         }
 
-        public void SetTrigger(Enum trigger, byte value)
+        public void SetTrigger(Xbox360Slider xbSlider, byte value)
         {
-            if (xbox != null && trigger is Xbox360Slider xs)
-                xbox.SetSliderValue(xs, value);
-            else if (ds4 != null && trigger is DualShock4Slider ds)
-                ds4.SetSliderValue(ds, value);
+            xbox?.SetSliderValue(xbSlider, value);
+        }
+        public void SetTrigger(DualShock4Slider dsSlider, byte value)
+        {
+            ds4?.SetSliderValue(dsSlider, value);
         }
 
-        public void SetDPad(Enum direction, bool pressed)
+        public void SetDPad(Xbox360Button xbButton, bool pressed)
         {
-            if (xbox != null && direction is Xbox360Button xb)
-                xbox.SetButtonState(xb, pressed);
-            else if (ds4 != null && direction is DualShock4DPadDirection dd)
-                ds4.SetDPadDirection(dd);
+            xbox?.SetButtonState(xbButton, pressed);
+        }
+        public void SetDPad(DualShock4DPadDirection dsDPad, bool pressed)
+        {
+            ds4?.SetDPadDirection(dsDPad);
         }
 
         /// <summary>
