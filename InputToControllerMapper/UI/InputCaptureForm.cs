@@ -72,16 +72,10 @@ namespace InputToControllerMapper
 
             try
             {
-                // Support both delegate (constructor) and event handler usage
-                wootingHandler = new WootingAnalogHandler(v =>
+                wootingHandler = new WootingAnalogHandler();
+                wootingHandler.AnalogValueUpdated += (_, e) =>
                 {
-                    byte val = (byte)(Math.Clamp(v, 0f, 1f) * 255);
-                    controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
-                    controller.SubmitReport();
-                });
-                wootingHandler.AnalogValueChanged += (_, value) =>
-                {
-                    byte val = (byte)(Math.Clamp(value, 0f, 1f) * 255);
+                    byte val = (byte)(Math.Clamp(e.Value, 0f, 1f) * 255);
                     controller.SetSliderValue(Xbox360Slider.LeftTrigger, val);
                     controller.SubmitReport();
                 };

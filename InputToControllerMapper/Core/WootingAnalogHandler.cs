@@ -46,11 +46,11 @@ namespace InputToControllerMapper
         public float ReleaseThreshold { get; set; } = 0.2f;
 
         /// <summary>Raised when a key's analog value exceeds <see cref="PressThreshold"/>.</summary>
-        public event EventHandler<AnalogKeyEventArgs> KeyPressed;
+        public event EventHandler<AnalogKeyEventArgs>? KeyPressed;
         /// <summary>Raised when a key's analog value goes below <see cref="ReleaseThreshold"/>.</summary>
-        public event EventHandler<AnalogKeyEventArgs> KeyReleased;
+        public event EventHandler<AnalogKeyEventArgs>? KeyReleased;
         /// <summary>Raised every poll with the current value of a key.</summary>
-        public event EventHandler<AnalogKeyEventArgs> AnalogValueUpdated;
+        public event EventHandler<AnalogKeyEventArgs>? AnalogValueUpdated;
 
         /// <summary>
         /// Initialises the SDK and starts polling in the background.
