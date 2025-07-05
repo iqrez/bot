@@ -111,34 +111,31 @@ namespace Core
 
             foreach (var kv in buttonStates)
             {
-                if (Enum.TryParse<Xbox360Button>(kv.Key, true, out var xb))
-                    ctrl.SetButton(xb, kv.Value);
-                else if (Enum.TryParse<DualShock4Button>(kv.Key, true, out var db))
-                    ctrl.SetButton(db, kv.Value);
+                if (Enum.TryParse<Xbox360Button>(kv.Key, out var xbButton))
+                    ctrl.SetButton(xbButton, kv.Value);
+                else if (Enum.TryParse<DualShock4Button>(kv.Key, out var dsButton))
+                    ctrl.SetButton(dsButton, kv.Value);
             }
-
             foreach (var kv in axisStates)
             {
-                if (Enum.TryParse<Xbox360Axis>(kv.Key, true, out var xa))
-                    ctrl.SetAxis(xa, (short)(kv.Value * short.MaxValue));
-                else if (Enum.TryParse<DualShock4Axis>(kv.Key, true, out var da))
-                    ctrl.SetAxis(da, (byte)(kv.Value * byte.MaxValue));
+                if (Enum.TryParse<Xbox360Axis>(kv.Key, out var xbAxis))
+                    ctrl.SetAxis(xbAxis, (short)(kv.Value * short.MaxValue));
+                else if (Enum.TryParse<DualShock4Axis>(kv.Key, out var dsAxis))
+                    ctrl.SetAxis(dsAxis, (byte)(Math.Clamp(kv.Value, 0f, 1f) * byte.MaxValue));
             }
-
             foreach (var kv in triggerStates)
             {
-                if (Enum.TryParse<Xbox360Slider>(kv.Key, true, out var xs))
-                    ctrl.SetTrigger(xs, (byte)(kv.Value * byte.MaxValue));
-                else if (Enum.TryParse<DualShock4Slider>(kv.Key, true, out var ds))
-                    ctrl.SetTrigger(ds, (byte)(kv.Value * byte.MaxValue));
+                if (Enum.TryParse<Xbox360Slider>(kv.Key, out var xbSlider))
+                    ctrl.SetTrigger(xbSlider, (byte)(kv.Value * byte.MaxValue));
+                else if (Enum.TryParse<DualShock4Slider>(kv.Key, out var dsSlider))
+                    ctrl.SetTrigger(dsSlider, (byte)(kv.Value * byte.MaxValue));
             }
-
             foreach (var kv in dpadStates)
             {
-                if (Enum.TryParse<Xbox360Button>(kv.Key, true, out var xbDir))
-                    ctrl.SetDPad(xbDir, kv.Value);
-                else if (Enum.TryParse<DualShock4DPadDirection>(kv.Key, true, out var dd))
-                    ctrl.SetDPad(dd, kv.Value);
+                if (Enum.TryParse<Xbox360Button>(kv.Key, out var xbButton))
+                    ctrl.SetDPad(xbButton, kv.Value);
+                else if (Enum.TryParse<DualShock4DPadDirection>(kv.Key, out var dsDPad))
+                    ctrl.SetDPad(dsDPad, kv.Value);
             }
 
             ctrl.Submit();
