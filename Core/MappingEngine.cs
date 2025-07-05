@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Nefarius.ViGEm.Client.Targets.Xbox360;
+using Nefarius.ViGEm.Client.Targets.DualShock4;
 
 namespace Core
 {
@@ -108,13 +110,36 @@ namespace Core
             ApplyMouseMappings();
 
             foreach (var kv in buttonStates)
-                ctrl.SetButtonState(kv.Key, kv.Value);
+            {
+                if (Enum.TryParse<Xbox360Button>(kv.Key, true, out var xb))
+                    ctrl.SetButton(xb, kv.Value);
+                else if (Enum.TryParse<DualShock4Button>(kv.Key, true, out var db))
+                    ctrl.SetButton(db, kv.Value);
+            }
+
             foreach (var kv in axisStates)
-                ctrl.SetAxisValue(kv.Key, (short)(kv.Value * short.MaxValue));
+            {
+                if (Enum.TryParse<Xbox360Axis>(kv.Key, true, out var xa))
+                    ctrl.SetAxis(xa, (short)(kv.Value * short.MaxValue));
+                else if (Enum.TryParse<DualShock4Axis>(kv.Key, true, out var da))
+                    ctrl.SetAxis(da, (byte)(kv.Value * byte.MaxValue));
+            }
+
             foreach (var kv in triggerStates)
-                ctrl.SetTriggerValue(kv.Key, (byte)(kv.Value * byte.MaxValue));
+            {
+                if (Enum.TryParse<Xbox360Slider>(kv.Key, true, out var xs))
+                    ctrl.SetTrigger(xs, (byte)(kv.Value * byte.MaxValue));
+                else if (Enum.TryParse<DualShock4Slider>(kv.Key, true, out var ds))
+                    ctrl.SetTrigger(ds, (byte)(kv.Value * byte.MaxValue));
+            }
+
             foreach (var kv in dpadStates)
-                ctrl.SetDPadState(kv.Key, kv.Value);
+            {
+                if (Enum.TryParse<Xbox360Button>(kv.Key, true, out var xbDir))
+                    ctrl.SetDPad(xbDir, kv.Value);
+                else if (Enum.TryParse<DualShock4DPadDirection>(kv.Key, true, out var dd))
+                    ctrl.SetDPad(dd, kv.Value);
+            }
 
             ctrl.Submit();
         }
