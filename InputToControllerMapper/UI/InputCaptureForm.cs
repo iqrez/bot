@@ -5,7 +5,6 @@ using System.Windows.Forms;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
-using Nefarius.ViGEm.Client.Targets.DualShock4;
 using Core;
 
 namespace InputToControllerMapper
@@ -75,7 +74,6 @@ namespace InputToControllerMapper
 
             try
             {
-                // Support both delegate (constructor) and event handler usage
                 wootingHandler = new WootingAnalogHandler(v =>
                 {
                     byte val = (byte)(Math.Clamp(v, 0f, 1f) * 255);
