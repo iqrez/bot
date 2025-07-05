@@ -4,8 +4,15 @@ using Nefarius.ViGEm.Client.Targets.DualShock4;
 
 namespace Core
 {
+    public enum VirtualControllerType
+    {
+        Xbox360,
+        DualShock4
+    }
+
     public interface IVirtualController
     {
+        VirtualControllerType ControllerType { get; }
         void SetButton(Xbox360Button button, bool pressed);
         void SetButton(DualShock4Button button, bool pressed);
         void SetAxis(Xbox360Axis axis, short value);

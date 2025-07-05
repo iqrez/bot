@@ -1,8 +1,11 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nefarius.ViGEm.Client;
+using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
+using Nefarius.ViGEm.Client.Targets.DualShock4;
 using Core;
 using System.Windows.Forms;
 
@@ -13,6 +16,39 @@ namespace InputToControllerMapper
         private readonly ViGEmClient client;
         private readonly IXbox360Controller controller;
         private Profile profile = new Profile();
+
+        private static readonly Dictionary<string, Xbox360Button> ButtonMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["A"] = Xbox360Button.A,
+            ["B"] = Xbox360Button.B,
+            ["X"] = Xbox360Button.X,
+            ["Y"] = Xbox360Button.Y,
+            ["Start"] = Xbox360Button.Start,
+            ["Back"] = Xbox360Button.Back,
+            ["LeftThumb"] = Xbox360Button.LeftThumb,
+            ["RightThumb"] = Xbox360Button.RightThumb,
+            ["LeftShoulder"] = Xbox360Button.LeftShoulder,
+            ["RightShoulder"] = Xbox360Button.RightShoulder,
+            ["Up"] = Xbox360Button.Up,
+            ["Down"] = Xbox360Button.Down,
+            ["Left"] = Xbox360Button.Left,
+            ["Right"] = Xbox360Button.Right,
+            ["Guide"] = Xbox360Button.Guide
+        };
+
+        private static readonly Dictionary<string, Xbox360Axis> AxisMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftThumbX"] = Xbox360Axis.LeftThumbX,
+            ["LeftThumbY"] = Xbox360Axis.LeftThumbY,
+            ["RightThumbX"] = Xbox360Axis.RightThumbX,
+            ["RightThumbY"] = Xbox360Axis.RightThumbY
+        };
+
+        private static readonly Dictionary<string, Xbox360Slider> TriggerMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LeftTrigger"] = Xbox360Slider.LeftTrigger,
+            ["RightTrigger"] = Xbox360Slider.RightTrigger
+        };
 
         public ControllerMappingEngine()
         {
@@ -68,7 +104,7 @@ namespace InputToControllerMapper
                 }
                 SetControllerState(action, val);
             }
-            controller.SubmitReport();
+            controller.Submit();
         }
 
         private static float ApplyAnalogOptions(float value, AnalogOptions opts)
@@ -89,21 +125,21 @@ namespace InputToControllerMapper
             switch (action.Element)
             {
                 case ControllerElement.Button:
-                    if (Enum.TryParse(action.Target, true, out Xbox360Button xbButton))
-                        controller.SetButtonState(xbButton, value > 0.5f);
+                    if (ButtonMap.TryGetValue(action.Target, out var btn))
+                        controller.SetButtonState(btn, value > 0.5f);
                     break;
                 case ControllerElement.Axis:
-                    if (Enum.TryParse(action.Target, true, out Xbox360Axis xbAxis))
+                    if (AxisMap.TryGetValue(action.Target, out var axis))
                     {
                         short axisVal = (short)(value * short.MaxValue);
-                        controller.SetAxisValue(xbAxis, axisVal);
+                        controller.SetAxisValue(axis, axisVal);
                     }
                     break;
                 case ControllerElement.Trigger:
-                    if (Enum.TryParse(action.Target, true, out Xbox360Slider xbSlider))
+                    if (TriggerMap.TryGetValue(action.Target, out var trig))
                     {
                         byte trigVal = (byte)(Math.Clamp(value, 0f, 1f) * byte.MaxValue);
-                        controller.SetSliderValue(xbSlider, trigVal);
+                        controller.SetSliderValue(trig, trigVal);
                     }
                     break;
             }
