@@ -27,28 +27,67 @@ namespace InputToControllerMapper.UI
             Size = new Size(900, 600);
             FormClosing += OnFormClosing;
 
-            profileList = new ListBox { Dock = DockStyle.Left, Width = 150 };
+            profileList = new ListBox
+            {
+                Dock = DockStyle.Left,
+                Width = 150,
+                TabIndex = 0,
+                AccessibleName = "Profile list",
+                AccessibleDescription = "Select active profile"
+            };
             Controls.Add(profileList);
             profileList.SelectedIndexChanged += (s, e) => LoadSelectedProfile();
 
-            mappingGrid = new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false };
+            mappingGrid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = false,
+                TabIndex = 1,
+                AccessibleName = "Mapping grid",
+                AccessibleDescription = "Displays input mappings"
+            };
             mappingGrid.Columns.Add("Input", "Input");
             mappingGrid.Columns.Add("Output", "Controller Output");
             Controls.Add(mappingGrid);
 
             var rightPanel = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 120, FlowDirection = FlowDirection.TopDown };
-            var manageBtn = new Button { Text = "Profiles" };
+            var manageBtn = new Button
+            {
+                Text = "&Profiles",
+                TabIndex = 2,
+                AccessibleName = "Manage profiles",
+                AccessibleDescription = "Open profile management dialog"
+            };
             manageBtn.Click += (s, e) => new ProfileEditor(profileManager).ShowDialog();
-            var macroBtn = new Button { Text = "Macros" };
+            var macroBtn = new Button
+            {
+                Text = "&Macros",
+                TabIndex = 3,
+                AccessibleName = "Edit macros",
+                AccessibleDescription = "Open macro editor"
+            };
             macroBtn.Click += (s, e) => new MacroEditor().ShowDialog();
-            var curveBtn = new Button { Text = "Curve" };
+            var curveBtn = new Button
+            {
+                Text = "&Curve",
+                TabIndex = 4,
+                AccessibleName = "Adjust curve",
+                AccessibleDescription = "Open curve editor"
+            };
             curveBtn.Click += (s, e) => ShowCurveEditor();
             rightPanel.Controls.Add(manageBtn);
             rightPanel.Controls.Add(macroBtn);
             rightPanel.Controls.Add(curveBtn);
             Controls.Add(rightPanel);
 
-            inputStateBox = new TextBox { Dock = DockStyle.Bottom, ReadOnly = true };
+            inputStateBox = new TextBox
+            {
+                Dock = DockStyle.Bottom,
+                ReadOnly = true,
+                TabIndex = 5,
+                AccessibleName = "Input state",
+                AccessibleDescription = "Shows recent raw input"
+            };
             Controls.Add(inputStateBox);
 
             tray = new TrayIcon(this, profileManager);
@@ -152,10 +191,42 @@ namespace InputToControllerMapper.UI
             {
                 Text = "Curve / Deadzone";
                 Size = new Size(300, 200);
-                var dead = new TrackBar { Minimum = 0, Maximum = 100, Dock = DockStyle.Top };
-                var sens = new TrackBar { Minimum = 1, Maximum = 200, Dock = DockStyle.Top, Value = 100 };
+
+                var dead = new TrackBar
+                {
+                    Minimum = 0,
+                    Maximum = 100,
+                    Dock = DockStyle.Top,
+                    TabIndex = 0,
+                    AccessibleName = "Deadzone",
+                    AccessibleDescription = "Amount of stick deadzone"
+                };
+                var sens = new TrackBar
+                {
+                    Minimum = 1,
+                    Maximum = 200,
+                    Dock = DockStyle.Top,
+                    Value = 100,
+                    TabIndex = 1,
+                    AccessibleName = "Sensitivity",
+                    AccessibleDescription = "Mouse sensitivity percentage"
+                };
+
+                var close = new Button
+                {
+                    Text = "&Close",
+                    Dock = DockStyle.Bottom,
+                    TabIndex = 2,
+                    AccessibleName = "Close",
+                    AccessibleDescription = "Close this dialog",
+                    DialogResult = DialogResult.OK
+                };
+
+                Controls.Add(close);
                 Controls.Add(sens);
                 Controls.Add(dead);
+
+                AcceptButton = close;
             }
         }
     }
